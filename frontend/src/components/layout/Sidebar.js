@@ -65,7 +65,7 @@ const Sidebar = () => {
     setErrorHistory(null);
     try {
       // Use apiClient for the request
-      const response = await apiClient.get('/chat_history/sessions');
+      const response = await apiClient.get('/chat/sessions');
 
       // Axios nests the actual data in `response.data`
       const data = response.data;
@@ -198,7 +198,7 @@ const Sidebar = () => {
   // Add pin/unpin functionality
   const handleTogglePin = async (chatId, currentPinned) => {
     try {
-      await apiClient.post(`/chat_history/sessions/${chatId}/pin`, {
+      await apiClient.post(`/chat/sessions/${chatId}/pin`, {
         is_pinned: !currentPinned
       });
       

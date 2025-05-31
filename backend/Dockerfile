@@ -20,18 +20,25 @@ RUN apk update && apk add --no-cache \
 # Create and set the working directory
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
+# Copy the application code into the container
 COPY . /app
 
-# Install any needed packages specified in requirements.txt
+# Install dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Make port 5000 available to the world outside this container
 EXPOSE 5000
 
-# Set the Flask application
-ENV FLASK_APP=main.py
+# Set environment variables for Flask
+# FLASK_APP is now set to run.py which contains the app instance
+ENV FLASK_APP=run.py 
+# FLASK_RUN_HOST and FLASK_RUN_PORT are read from environment in run.py
+# Set them here if you want to fix them for the container, otherwise they can be set at runtime.
+# ENV FLASK_RUN_HOST=0.0.0.0
+# ENV FLASK_RUN_PORT=5000
+# ENV FLASK_CONFIG=production # Example: set to production for Docker builds
 
-# Run the Flask development server
-CMD ["python", "main.py", "--host=0.0.0.0", "--port=5000"]
+# Command to run the application
+# run.py will use environment variables for host and port, defaulting to 0.0.0.0:5000
+CMD ["python", "run.py"]

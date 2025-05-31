@@ -156,7 +156,7 @@ function HomePageForRegisteredUserView() { // Renamed component
       setIsLoadingPinned(true);
       try {
         // Use apiClient for the request
-        const response = await apiClient.get('/chat_history/sessions');
+        const response = await apiClient.get('/chat/sessions');
         
         // Correctly access the response data structure from axios
         const data = response.data;

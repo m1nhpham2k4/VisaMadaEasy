@@ -18,6 +18,4 @@ limiter = Limiter(
 jwt = JWTManager()
 
 # Khởi tạo đối tượng Migrate
-migrate = Migrate()
-
-
+migrate = Migrate() 

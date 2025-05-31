@@ -65,7 +65,7 @@ const ChatbotRegisteredUserView = ({ fadeInClass }) => {
       setCurrentSessionId(sid); // Set current session ID for sending new messages
 
       try {
-        const response = await apiClient.get(`/chat_history/sessions/${sid}/messages`);
+        const response = await apiClient.get(`/chat/sessions/${sid}/messages`);
         const fetchedMessages = response.data.messages || [];
         // Transform fetched messages if necessary (e.g., to match chatHistory structure)
         const formattedMessages = fetchedMessages.map(msg => ({

@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify,request
-from models import User, TokenBlocklist
+from .models import User, TokenBlocklist # Will need to be updated to app.auth.models or app.common_models
 from flask_jwt_extended import (
     create_access_token, 
     create_refresh_token, 
@@ -8,7 +8,7 @@ from flask_jwt_extended import (
     current_user,
     get_jwt_identity
 )
-from extensions import db, limiter, jwt
+from ..extensions import db, limiter, jwt # Will need to be updated to app.extensions
 from datetime import datetime
 from datetime import timedelta
 import uuid
@@ -42,7 +42,7 @@ def user_lookup_callback(_jwt_header, jwt_data):
     else:
         # Nếu là token của người dùng đã đăng ký, identity là username
         # current_user sẽ là một instance của User model
-        return User.query.filter_by(username=identity).one_or_none()
+        return User.query.filter_by(username=identity).one_or_none() # Will need to be updated
 
 @auth_bp.post('/register')
 @limiter.limit("5 per minute")
@@ -60,15 +60,15 @@ def register_user():
     if not data or not all(key in data for key in ('username', 'email', 'password')) :
         return jsonify({"error": "Missing username, email, or password"}), 400
 
-    user = User.get_user_by_username(data.get('username'))
+    user = User.get_user_by_username(data.get('username')) # Will need to be updated
     if user is not None:
         return jsonify({"message":"User already exists"}), 403
     
-    email_exists = User.get_user_by_email(data.get('email'))
+    email_exists = User.get_user_by_email(data.get('email')) # Will need to be updated
     if email_exists is not None:
         return jsonify({"message": "Email already registered"}), 403
 
-    new_user = User(
+    new_user = User( # Will need to be updated
         username = data.get('username'),
         email = data.get('email'),
     ) 
@@ -99,7 +99,7 @@ def login_user():
     if not email or not password:
         return jsonify({"error": "Missing email or password"}), 400 # Sửa thông báo lỗi
 
-    user = User.query.filter(User.email == email).first() # Sửa: Query bằng email
+    user = User.query.filter(User.email == email).first() # Sửa: Query bằng email. Will need to be updated
 
     if user and user.check_password(password):
         # Thêm claim 'type: "registered"' cho user đã đăng ký
@@ -138,7 +138,7 @@ def who_am_i():
             "type": "guest"
         }
         message = "Guest session details retrieved"
-    elif isinstance(current_user, User):
+    elif isinstance(current_user, User): # Will need to be updated
         user_info = {
             "id": current_user.id,
             "username": current_user.username,
@@ -201,12 +201,12 @@ def logout_user():
         return jsonify({"message": f"Guest session ended. Client should clear {token_type_from_payload.capitalize()} token."}), 200
     elif user_custom_type == "registered":
         # Đối với user đã đăng ký, tìm user bằng username (identity)
-        user = User.query.filter(User.username == identity).first() 
+        user = User.query.filter(User.username == identity).first() # Will need to be updated
         if not user:
             # Có thể xảy ra nếu token của user đã bị xóa
             return jsonify({"error": "User identity from token not found"}), 400
 
-        revoked_token = TokenBlocklist(
+        revoked_token = TokenBlocklist( # Will need to be updated
             jti=jti, 
             token_type=token_type_from_payload,
             user_id=user.id, # Sử dụng user.id
@@ -249,7 +249,4 @@ def initiate_guest_session():
             "access_token": access_token,
             "guest_id": guest_id # Trả về guest_id nếu frontend cần
         }
-    ), 200
-
-
-
+    ), 200 
