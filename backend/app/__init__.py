@@ -14,6 +14,8 @@ from .extensions import db, jwt, limiter, migrate
 from .auth.models import User, TokenBlocklist 
 from .auth.routes import GuestUser # Import GuestUser for user_lookup_loader
 
+from app.checklists import models as checklist_models
+
 def create_app(config_name=None):
     if config_name is None:
         config_name = os.environ.get('FLASK_CONFIG', 'default')
@@ -53,7 +55,7 @@ def create_app(config_name=None):
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(chat_bp, url_prefix='/chat')
     app.register_blueprint(user_bp, url_prefix='/users')
-    # app.register_blueprint(main_bp) # For general routes, prefix might be '/'
+#    app.register_blueprint(checklist_bp, url_prefix='/checklists')
 
     # JWT Configuration and handlers
     # user_loader_callback is now in auth.routes.py and registered with jwt object there.
