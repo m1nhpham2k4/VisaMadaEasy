@@ -1,0 +1,160 @@
+.checklist-page-container {
+    padding: 20px 32px;
+    width: 100%;
+    background: transparent; /* Remove white background */
+    box-shadow: none; /* Remove shadow */
+    margin: 0; /* Remove margin */
+    font-family: 'Inter', sans-serif;
+}
+
+/* Styles for the new main header section (title and export button) */
+.checklist-main-header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 26px; /* Gap between this header and the meta properties below it */
+    width: 100%;
+}
+
+.checklist-main-header-section h1 {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 30px; /* From Figma: node 331:1247, Du học bằng thạc sĩ Mỹ */
+    font-weight: 700;
+    color: #0F172B;
+}
+
+.export-pdf-button-page {
+    background-color: #FFFFFF; /* White background from Figma CTA Button */
+    color: #1E46A4; /* Blue text color from Figma */
+    border: 2px solid #1E46A4; /* Blue border from Figma */
+    padding: 8px 20px; /* Padding from Figma */
+    border-radius: 88px; /* Large border radius from Figma */
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.export-pdf-button-page:hover {
+    background-color: #1E46A4;
+    color: #FFFFFF;
+}
+
+.checklist-content {
+    margin-top: 0; /* Adjusted as ChecklistProfileHeader now has bottom padding */
+    padding: 0;
+    width: 100%;
+}
+
+/* Make sure the main content area takes full available width */
+.chatbot-container .main-content {
+    background-color: #EDF2FB; /* Set background color to match Figma */
+    padding: 0; /* Remove padding */
+}
+
+/* Loading Spinner Styles */
+.loading-spinner-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+    color: #0F172B;
+    margin-top: 50px;
+}
+
+.loading-spinner {
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #1E46A4;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Error Message Styles */
+.error-message {
+    color: #D32F2F;
+    background-color: #FFEBEE;
+    border: 1px solid #D32F2F;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 50px 32px;
+    text-align: center;
+}
+
+/* Informational Message Styles */
+.info-message {
+    color: #0277BD;
+    background-color: #E1F5FE;
+    border: 1px solid #0277BD;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 50px 32px;
+    text-align: center;
+}
+
+/* Styles for the Task List Header Section */
+.task-list-header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 36px; /* Space above this section */
+    margin-bottom: 16px; /* Space below this section, before categories */
+    width: 100%;
+}
+
+.task-list-title {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 24px; /* Figma style_X7B2BB */
+    color: #0F172B;
+    margin: 0;
+}
+
+.view-all-documents-link {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 16px; /* Figma style_BOE4R2 */
+    color: #0F172B;
+    gap: 8px; /* Space between text and icon */
+}
+
+.view-all-documents-link:hover span,
+.view-all-documents-link:hover svg {
+    color: #1E46A4; /* Example hover color */
+    text-decoration: underline;
+}
+
+.view-all-documents-link svg {
+    transition: color 0.2s;
+}
+
+.view-all-documents-link span {
+    transition: color 0.2s;
+}
+
+/* Print media query to handle PDF export */
+@media print {
+    .chatbot-container .sidebar,
+    .chatbot-container .top-bar,
+    .export-pdf-button-page, /* Ensure this new button is also hidden */
+    .checklist-main-header-section { /* Hide the entire header on print */
+        display: none !important;
+    }
+
+    .checklist-page-container {
+        padding: 20px;
+    }
+} 

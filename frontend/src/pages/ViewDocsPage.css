@@ -1,0 +1,63 @@
+/* Styles for ViewDocsPage.js */
+
+/* Inherit loading spinner and error message styles from ChecklistPage.css or global styles if available */
+/* If not, define them here or ensure they are globally accessible */
+.loading-spinner-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 50px;
+    color: #555;
+}
+
+.loading-spinner {
+    border: 4px solid #f3f3f3; /* Light grey */
+    border-top: 4px solid #1E46A4; /* Blue */
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.error-message,
+.info-message {
+    padding: 20px;
+    text-align: center;
+    font-size: 16px;
+    color: #D8000C; /* Error color */
+    background-color: #FFD2D2; /* Light red background */
+    border: 1px solid #D8000C;
+    border-radius: 4px;
+    margin: 20px;
+}
+
+.info-message {
+    color: #00529B; /* Info color */
+    background-color: #BDE5F8; /* Light blue background */
+    border: 1px solid #00529B;
+}
+
+.view-docs-page-content {
+    padding: 0 20px 20px 20px; /* Match header padding for consistency */
+    /* This will be the container for the list of documents/folders */
+}
+
+.documents-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0; /* DocumentFolderItem has its own bottom border */
+}
+
+/* Styles for .category-title, .documents-in-category, .no-documents-in-category 
+   are removed as the structure has changed. DocumentFolderItem now handles each category row. 
+   Ensure DocumentFolderItem.css has all necessary styles for these rows. */
+
+/* Ensure ChecklistPage.css styles for .loading-spinner-container, .error-message, .info-message */
+/* are available or replicate/import them if they are local to ChecklistPage.css */ 

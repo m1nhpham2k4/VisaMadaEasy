@@ -11,7 +11,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
 import ChatbotInterface from './pages/ChatbotInterface'; // Import from new location
-// import logo from './logo.svg'; // Default CRA import, can be removed if not used
+import ChecklistPage from './pages/ChecklistPage'; // Import the new ChecklistPage
+import ViewDocsPage from './pages/ViewDocsPage'; // Import the new ViewDocsPage
 import './App.css'; // Default CRA import for styling
 
 // SiteHeader component đã được xóa
@@ -31,6 +32,9 @@ function App() {
           <Route path="/chatbot" element={<ChatbotInterface />} /> {/* Original chatbot route */}
           <Route path="/chat" element={<ChatbotInterface />} /> {/* New route for chat without session ID */}
           <Route path="/chat/:sessionId" element={<ChatbotInterface />} /> {/* New route for accessing specific chat sessions */}
+          <Route path="/checklists/:profileId" element={<ChecklistPage />} /> {/* Old route for ChecklistPage */}
+          <Route path="/checklist/:profileId" element={<ChecklistPage />} /> {/* New route for ChecklistPage */}
+          <Route path="/checklist/:profileId/documents" element={<ViewDocsPage />} /> {/* Route for ViewDocsPage */}
           <Route path="/" element={<LandingPage />} />
         </Routes>
       </main>

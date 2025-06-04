@@ -1,0 +1,40 @@
+.reminder-options-container {
+    position: absolute;
+    top: 0;
+    right: -190px;
+    background-color: white;
+    border: 1px solid #7C8FBE;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 180px;
+    padding: 4px;
+    z-index: 1000;
+}
+
+.reminder-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.reminder-option:hover {
+    background-color: #F8FAFC;
+}
+
+.reminder-option.selected {
+    background-color: #E2EAFC;
+}
+
+.reminder-option-text {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: #0F172B;
+}
+
+.check-icon {
+    color: #0F172B;
+} 

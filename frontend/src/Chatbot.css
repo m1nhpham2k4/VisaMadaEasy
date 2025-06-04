@@ -1,3 +1,12 @@
+/* Add custom class for checklist layout */
+.checklist-layout {
+  padding: 0;
+}
+
+.checklist-layout .top-bar {
+  padding: 18px 32px;
+}
+
 /* General body styles to ensure Inter font is used if available */
 body {
   font-family: 'Inter', sans-serif;

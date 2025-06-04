@@ -7,6 +7,7 @@ import searchIconSVG from '../../assets/icons/search.svg';
 import pinIconSVG from '../../assets/icons/pin.svg';
 import arrowDropDownIconSVG from '../../assets/landing_page_icons/arrow_drop_down.svg';
 import apiClient from '../../services/apiClient'; // Import apiClient
+import checklistService from '../../services/checklistService'; // Import checklistService
 
 // Import new icons
 import moreHorizontalIconSVG from '../../assets/icons/more_horizontal.svg';
@@ -35,6 +36,7 @@ const Sidebar = () => {
   const location = useLocation(); // Get the current location to determine active chat
   const [newChatId, setNewChatId] = useState(null);
   const navigate = useNavigate(); // Hook for navigation
+  const [checklists, setChecklists] = useState([]); // State for checklists
 
   const [chatHistoryGroups, setChatHistoryGroups] = useState({
     pinned: [],
@@ -53,11 +55,33 @@ const Sidebar = () => {
     return match ? match[1] : null;
   }, [location.pathname]);
 
-  // Sample data based on the image
-  const hoSoItems = [
-    { id: 1, name: 'Du học bằng thạc sĩ Mỹ', link: '/profile/ths-my' },
-    { id: 2, name: 'Du học bằng cử nhân Canad...', link: '/profile/cn-canada' },
-  ];
+  // Get current checklist profile ID from URL if it exists
+  const currentChecklistId = React.useMemo(() => {
+    const match = location.pathname.match(/\/checklist\/(\d+)/);
+    return match ? match[1] : null;
+  }, [location.pathname]);
+
+  // Fetch checklists when component mounts
+  useEffect(() => {
+    const fetchChecklists = async () => {
+      try {
+        const response = await checklistService.getAllChecklists();
+        setChecklists(response.data);
+      } catch (error) {
+        console.error('Failed to fetch checklists:', error);
+      }
+    };
+
+    fetchChecklists();
+  }, []);
+
+  // Update the hoSoItems with checklists from state
+  const hoSoItems = checklists.map(checklist => ({
+    id: checklist.id,
+    name: checklist.title,
+    link: `/checklist/${checklist.id}`,
+    active: currentChecklistId === checklist.id.toString()
+  }));
 
   // Function to fetch chat sessions - wrap in useCallback to prevent dependency issues
   const fetchAndGroupSessions = useCallback(async () => {
