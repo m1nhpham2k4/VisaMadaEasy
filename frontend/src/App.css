@@ -17,10 +17,14 @@ body {
   color: #c62828;
   padding: 10px;
   border-radius: 8px; /* Updated to match common Figma radius */
-  margin-bottom: 24px; /* Updated to match Figma gap */
+  margin: 0 auto 24px; /* Center horizontally with auto left/right margins */
   text-align: center;
   font-size: 16px; 
   width: 100%; /* Ensure it takes form width */
+  align-self: center; /* For flex containers */
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 

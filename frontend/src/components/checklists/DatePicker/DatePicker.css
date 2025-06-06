@@ -1,0 +1,155 @@
+.date-picker-container {
+    position: absolute;
+    top: 40px;
+    left: 0;
+    z-index: 999;
+    font-family: 'Inter', sans-serif;
+}
+
+.calendar-container {
+    display: flex;
+    flex-direction: column;
+    background-color: #FFFFFF;
+    border: 1px solid #7C8FBE;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 300px;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 16px 10px;
+    border-bottom: 1px solid #E2EAFC;
+}
+
+.month-name {
+    font-weight: 700;
+    font-size: 16px;
+    color: #0F172B;
+}
+
+.month-navigation {
+    display: flex;
+    gap: 10px;
+}
+
+.month-nav-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #0F172B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+}
+
+.month-nav-btn:hover {
+    background-color: #E2EAFC;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    padding: 10px;
+}
+
+.calendar-day {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+    color: #0F172B;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+}
+
+.calendar-day:hover:not(.weekday):not(.empty) {
+    background-color: #F8FAFC;
+}
+
+.calendar-day.weekday {
+    font-weight: 400;
+    opacity: 0.7;
+    cursor: default;
+}
+
+.calendar-day.empty {
+    cursor: default;
+}
+
+.calendar-day.selected {
+    background-color: #1E46A4;
+    color: #FFFFFF;
+}
+
+.calendar-separator {
+    height: 1px;
+    background-color: #7C8FBE;
+    margin: 0;
+}
+
+.date-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 18px 18px;
+}
+
+.date-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.option-label {
+    font-size: 12px;
+    color: #000000;
+}
+
+.selected-date {
+    font-size: 12px;
+    color: #0F172B;
+    border: 1px solid #0F172B;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.reminder-options {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dropdown-selector {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #7C8FBE;
+    cursor: pointer;
+}
+
+.dropdown-selector:hover {
+    color: #0F172B;
+}
+
+.dropdown-selector svg {
+    transition: transform 0.3s ease;
+}
+
+.dropdown-selector.active svg {
+    transform: rotate(90deg);
+} 

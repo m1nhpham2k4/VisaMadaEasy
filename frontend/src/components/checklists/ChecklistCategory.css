@@ -1,0 +1,17 @@
+.checklist-category {
+    margin-bottom: 36px; /* Increased spacing between categories to match Figma */
+    font-family: 'Inter', sans-serif;
+}
+
+.category-title {
+    font-size: 20px; /* Matches Figma style_H974EF */
+    font-weight: 700; /* Matches Figma style_H974EF */
+    color: #0F172B; /* Matches Figma fill_N9XFR7 */
+    margin: 0 0 16px 0;
+}
+
+.category-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0; /* Remove gap between items */
+} 

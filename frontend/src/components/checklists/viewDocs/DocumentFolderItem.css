@@ -1,0 +1,114 @@
+.document-folder-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* If you add actions/counts on the right */
+    padding: 12px 0; /* Matches Document tab padding from Figma (top/bottom only for list items) */
+    border-bottom: 2px solid #7C8FBE; /* Figma stroke_321I8K */
+    width: 100%; /* Ensure it takes full width if parent is constrained */
+}
+
+.folder-info {
+    display: flex;
+    align-items: center;
+}
+
+.folder-icon {
+    color: #040921; /* Figma fill_5CA7B7 for folder icon */
+    margin-right: 8px; /* Space between icon and text */
+}
+
+.folder-name {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400; /* Regular */
+    font-size: 16px;
+    color: #000000; /* Figma text color fill_TOTSDA for item names */
+    line-height: 1.21; /* From Figma style_ZL2CZ8 */
+}
+
+/* Optional: styles for item count or other elements if added later */
+/*
+.folder-item-count {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: #555;
+    margin-left: auto; 
+}
+*/ 
+
+/* Updated styles for DocumentFolderItem.js, now acting as a document row */
+.document-folder-item.new-doc-item-layout {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0; /* Consistent with previous item padding */
+    border-bottom: 2px solid #7C8FBE; /* Figma stroke_321I8K, from original Document tab */
+    width: 100%;
+    position: relative; /* For positioning the options menu */
+}
+
+.doc-item-info-left {
+    display: flex;
+    align-items: center;
+    flex-grow: 1; /* Allow name to take available space */
+    min-width: 0; /* For text ellipsis on item name */
+}
+
+.doc-item-icon {
+    /* color: #040921; /* Original folder icon color */
+    color: #0F172B; /* Figma fill_MKAV6H for document icon in Document Tab body */
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.doc-item-name {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400; /* Figma style_E4NM7O (regular) */
+    font-size: 16px;
+    color: #000000; /* Figma style_E4NM7O text color */
+    line-height: 1.21;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 16px; /* Space before right-aligned content */
+}
+
+.doc-item-info-right {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.doc-item-date,
+.doc-item-size {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400; /* Figma style_E4NM7O (regular) */
+    font-size: 16px;
+    color: #000000; /* Figma style_E4NM7O text color */
+    line-height: 1.21;
+    margin-left: 22px; /* Figma gap in Document tab body (between date/size/icon) */
+    white-space: nowrap;
+}
+
+.doc-item-more-button {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    margin-left: 22px; /* Figma gap */
+    color: #0F172B; /* Figma icon color */
+    display: flex; /* Align icon properly if needed */
+    align-items: center;
+}
+
+.doc-item-more-button:hover,
+.doc-item-more-button:focus {
+    opacity: 0.7;
+}
+
+/* Remove old styles if they conflict or are no longer needed */
+/* For example, if .folder-info, .folder-icon, .folder-name were specific to old layout */
+.folder-info, .folder-icon, .folder-name {
+    display: none; /* Hide old class styles if this component is solely new-doc-item-layout */
+}
+
+/* Styles for FileOptionsMenu are in FileOptionsMenu.css */ 

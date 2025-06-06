@@ -4,18 +4,18 @@ from flask_limiter.util import get_remote_address
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 
-# Khởi tạo đối tượng SQLAlchemy
+# Initialize SQLAlchemy object
 db = SQLAlchemy()
 
-# Khởi tạo đối tượng Limiter
-# Sử dụng get_remote_address để xác định key cho rate limit (thường là IP)
+# Initialize Limiter object
+# Use get_remote_address to determine key for rate limit (usually IP)
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"] # Giới hạn mặc định, có thể tùy chỉnh
+    default_limits=["200 per day", "50 per hour"] # Default limits, can be customized
 )
 
-# Khởi tạo đối tượng JWTManager
+# Initialize JWTManager object
 jwt = JWTManager()
 
-# Khởi tạo đối tượng Migrate
+# Initialize Migrate object
 migrate = Migrate() 

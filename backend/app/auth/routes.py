@@ -118,7 +118,8 @@ def login_user():
             }
         ), 200
 
-    return jsonify({"error": "Invalid credentials"}), 401
+    #Check if email is registered or password is incorrect
+    return jsonify({"error": "Sai mật khẩu hoặc email không tồn tại!"}), 401
 
 @auth_bp.get('/whoami')
 @jwt_required()
@@ -134,7 +135,7 @@ def who_am_i():
     if isinstance(current_user, GuestUser):
         user_info = {
             "guest_id": current_user.guest_id,
-            "username": current_user.username, # Tên guest tạm thời
+            "username": current_user.username, # temporary guest usernames
             "type": "guest"
         }
         message = "Guest session details retrieved"
@@ -147,13 +148,13 @@ def who_am_i():
         }
         message = "Registered user details retrieved"
     else:
-        # Trường hợp này không nên xảy ra nếu token hợp lệ và user_lookup_loader hoạt động đúng
+        # This should not happen if the token is valid and user_lookup_loader is working correctly
         return jsonify({"error": "Unknown user type or token issue"}), 500
     
     return jsonify({
         "message": message, 
         "user_info": user_info,
-        # "claims": get_jwt() # Bỏ comment nếu muốn xem toàn bộ claims để debug
+        # "claims": get_jwt() # Uncomment if you want to see all claims for debugging
         }), 200
 
 @auth_bp.get('/refresh')
@@ -167,13 +168,13 @@ def refresh_token_endpoint():
         401: (Handled by Flask-JWT-Extended for missing/invalid/expired refresh token)
     """
     identity = get_jwt_identity()
-    # Khi refresh, chúng ta cũng cần biết type của user để tạo access token mới với claim đúng
-    # Refresh token cũng nên chứa claim 'type'
+    # When refreshing, we also need to know the type of user to create a new access token with the correct claim
+    # The refresh token should also contain the 'type' claim
     jwt_claims = get_jwt()
-    token_custom_type = jwt_claims.get("type") # Lấy 'type' từ refresh token
+    token_custom_type = jwt_claims.get("type") # Get 'type' from refresh token
 
     additional_claims = {}
-    if token_custom_type: # Chỉ thêm nếu type tồn tại trong refresh token
+    if token_custom_type: # Only add if type exists in refresh token
         additional_claims["type"] = token_custom_type
     
     access_token = create_access_token(identity=identity, additional_claims=additional_claims)
@@ -181,7 +182,7 @@ def refresh_token_endpoint():
     return jsonify({"access_token": access_token}), 200
 
 @auth_bp.get('/logout')
-@jwt_required(verify_type=False) # Chấp nhận cả access và refresh token
+@jwt_required(verify_type=False) # Accept both access and refresh tokens
 def logout_user():
     """
     Logs out a user by blocklisting the provided token (for registered users).
@@ -190,38 +191,38 @@ def logout_user():
     """
     token_payload = get_jwt()
     jti = token_payload['jti']
-    token_type_from_payload = token_payload['type'] # 'access' hoặc 'refresh' - loại của JWT
-    user_custom_type = token_payload.get('type') # Claim 'type' tùy chỉnh: 'guest' hoặc 'registered'
+    token_type_from_payload = token_payload['type'] # 'access' or 'refresh' - type of JWT
+    user_custom_type = token_payload.get('type') # Custom 'type' claim: 'guest' or 'registered'
     
-    identity = get_jwt_identity() # guest_id cho guest, username cho user
+    identity = get_jwt_identity() # guest_id for guest, username for user
 
     if user_custom_type == "guest":
-        # Đối với guest, logout chủ yếu là client xóa token.
-        # Server có thể không cần blocklist JTI để tránh làm đầy DB.
+        # For guest, logout mainly means client clears the token.
+        # Server may not need to blocklist JTI to avoid filling the DB.
         return jsonify({"message": f"Guest session ended. Client should clear {token_type_from_payload.capitalize()} token."}), 200
     elif user_custom_type == "registered":
-        # Đối với user đã đăng ký, tìm user bằng username (identity)
+        # For registered user, find user by username (identity)
         user = User.query.filter(User.username == identity).first() # Will need to be updated
         if not user:
-            # Có thể xảy ra nếu token của user đã bị xóa
+            # This can happen if the user's token has been deleted
             return jsonify({"error": "User identity from token not found"}), 400
 
         revoked_token = TokenBlocklist( # Will need to be updated
             jti=jti, 
             token_type=token_type_from_payload,
-            user_id=user.id, # Sử dụng user.id
+            user_id=user.id, # Use user.id
             expires_at=datetime.fromtimestamp(token_payload['exp'])
         )
         revoked_token.save()
         return jsonify({"message": f"Successfully logged out. {token_type_from_payload.capitalize()} token revoked."}) , 200
     else:
-        # Trường hợp không xác định được loại user từ token (không nên xảy ra)
+        # Case where user type cannot be determined from token (should not happen)
         return jsonify({"error": "Invalid token: unknown user type claim."}), 400
 
 
-# Endpoint mới để khởi tạo guest session
+# New endpoint to initiate guest session
 @auth_bp.post('/api/v1/guest/session/initiate')
-@limiter.limit("20 per minute") # Rate limit cho guest session
+@limiter.limit("20 per minute") # Rate limit for guest session
 def initiate_guest_session():
     """
     Initiates a new guest session and returns a guest JWT.
@@ -229,11 +230,11 @@ def initiate_guest_session():
     """
     guest_id = str(uuid.uuid4())
     
-    # Guest token có thời gian hết hạn ngắn, ví dụ 2 giờ
+    # Guest token has a short expiration time, e.g. 2 hours
     expires_delta = timedelta(hours=2) 
     
-    # Claim 'type: "guest"' để phân biệt với token của user đã đăng ký.
-    # Identity của guest token sẽ là guest_id.
+    # Claim 'type: "guest"' to distinguish from registered user tokens.
+    # The guest token's identity will be guest_id.
     additional_claims = {"type": "guest"}
     access_token = create_access_token(
         identity=guest_id, 
@@ -241,12 +242,12 @@ def initiate_guest_session():
         additional_claims=additional_claims
     )
     
-    # Guest không có refresh token
+    # Guest does not have a refresh token
     return jsonify(
         {
             "message": "Guest session initiated successfully",
-            "token_type": "guest", # Thông báo rõ đây là guest token
+            "token_type": "guest", # Notify that this is a guest token
             "access_token": access_token,
-            "guest_id": guest_id # Trả về guest_id nếu frontend cần
+            "guest_id": guest_id # Return guest_id if frontend needs it
         }
     ), 200 

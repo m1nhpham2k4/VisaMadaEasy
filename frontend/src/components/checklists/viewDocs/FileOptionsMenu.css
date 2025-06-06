@@ -1,0 +1,45 @@
+.file-options-menu {
+    position: fixed; /* Change to fixed to ensure it's positioned relative to the viewport */
+    background-color: #EDF2FB; /* Figma background color for File options frame */
+    border: 1px solid #7C8FBE; /* Figma stroke color */
+    border-radius: 8px; /* Figma has 16px, but that might be too large for a small menu */
+    padding: 8px; /* Figma padding for File options frame */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    min-width: 150px; /* Ensure enough width for text */
+    max-width: 250px; /* Prevent extremely wide menus */
+}
+
+.file-options-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 8px 12px; /* Figma padding for Option button */
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px; /* Figma text style */
+    font-weight: 400; /* Figma text style */
+    color: #0F172B; /* Figma text color for Download */
+    border-radius: 4px; /* For hover effect consistency */
+    gap: 12px; /* Figma gap in Option button */
+}
+
+.file-options-menu-item:hover {
+    background-color: #DDE3F0; /* Slightly darker shade for hover */
+}
+
+.file-options-menu-item.delete {
+    color: #E33838; /* Figma text color for Delete */
+}
+
+.file-options-menu-item.delete:hover {
+    background-color: #F8D7DA; /* Light red hover for delete */
+}
+
+.file-options-menu-icon {
+    /* Icon color is set by the parent button's text color due to 'currentColor' in Icon components */
+    flex-shrink: 0;
+} 

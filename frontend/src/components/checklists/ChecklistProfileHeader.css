@@ -1,0 +1,97 @@
+.checklist-profile-header {
+    padding: 0 0 26px 0; /* Bottom padding to match Figma's gap (node 331:1244, Frame 88, gap to Frame 81) */
+    width: 100%;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Title section is removed from JSX, hide if accidentally rendered or for safety */
+.checklist-title-section {
+    display: none;
+}
+
+.checklist-meta-section {
+    display: flex;
+    flex-direction: column; /* Stack meta items (Hạn nộp, Trạng thái) vertically */
+    gap: 16px; /* Gap between meta items as per Figma (node 157:891, gap in main component) */
+}
+
+.meta-item {
+    display: flex;
+    align-items: center; /* Vertically align label and its value/control */
+    gap: 16px; /* Gap between label and value/control as per Figma (e.g., node 157:876, Frame 83, gap) */
+    position: relative; /* For DatePicker positioning */
+}
+
+.meta-label {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0F172B; /* Figma style_TD3MZR */
+    /* min-width: 180px; Consider if needed for specific alignment not achieved by flex gap */
+}
+
+.meta-value {
+    font-size: 16px;
+    font-weight: 400;
+    color: #0F172B; /* Figma style_2V86AB */
+}
+
+/* Date clickable styling */
+.date-value.clickable {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 4px;
+    padding: 5px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.date-value.clickable:hover {
+    background-color: #E2EAFC;
+}
+
+.progress-meta-item { /* Specific styling for the 'Trạng thái hoàn thành' item */
+    align-items: center;
+}
+
+/* This is the main bordered container for the progress bar, corresponds to Figma Frame 35 (node 157:882) */
+.progress-bar-outer-container {
+    width: 65px; /* Figma Frame 35 width: 64.82px */
+    height: 27px; /* Approximate height for 9px fill + 2*4px padding + 2*2px border */
+    border: 2px solid #0F172B; /* Figma Frame 35 stroke_9YBYLJ */
+    border-radius: 13.5px; /* Figma Frame 35 borderRadius: 13.41px */
+    padding: 4px; /* Figma Frame 35 layout_4L1G3L padding: 4.47px (approx) */
+    box-sizing: border-box;
+    display: flex; /* To allow alignment of the inner track/fill */
+    align-items: center; /* Vertically center the inner track/fill */
+    background-color: transparent; /* Figma Frame 35 has no fill */
+}
+
+/* This is the track area within the bordered container, where the fill sits */
+.progress-bar-inner-track {
+    width: 100%;
+    height: 9px; /* Height of the fill bar (Figma Rectangle 33 height: 8.94px) */
+    background-color: rgba(124, 143, 190, 0.08); /* Very subtle track color, or transparent if preferred */
+    border-radius: 9px; /* Rounded ends for the track itself, matches fill's radius */
+    overflow: hidden; /* To clip the progress-bar-fill */
+}
+
+/* This is the actual green progress fill, corresponds to Figma Rectangle 33 (node 157:883) */
+.progress-bar-fill {
+    height: 100%;
+    background-color: #3BBC6A; /* Figma Rectangle 33 fill_2ZW4CH */
+    border-radius: 9px; /* Figma Rectangle 33 borderRadius: 8.94px - ensures rounded fill */
+    transition: width 0.3s ease;
+}
+
+.progress-value { /* The 'X/Y' text next to the progress bar */
+    margin-left: 8px; /* Gap between bar and text, as per Figma Frame 36 (node 157:881) gap */
+    font-size: 16px;
+    font-weight: 400;
+    color: #0F172B;
+}
+
+/* Export PDF button is removed from JSX, hide if accidentally rendered */
+.export-pdf-button {
+    display: none;
+} 
