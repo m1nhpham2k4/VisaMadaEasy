@@ -61,19 +61,20 @@ const Sidebar = () => {
     return match ? match[1] : null;
   }, [location.pathname]);
 
+  // Create a memoized, useCallback version of fetchChecklists to be used in multiple places
+  const fetchChecklists = useCallback(async () => {
+    try {
+      const response = await checklistService.getAllChecklists();
+      setChecklists(response.data);
+    } catch (error) {
+      console.error('Failed to fetch checklists:', error);
+    }
+  }, []); // Empty dependency array means it's created once
+
   // Fetch checklists when component mounts
   useEffect(() => {
-    const fetchChecklists = async () => {
-      try {
-        const response = await checklistService.getAllChecklists();
-        setChecklists(response.data);
-      } catch (error) {
-        console.error('Failed to fetch checklists:', error);
-      }
-    };
-
     fetchChecklists();
-  }, []);
+  }, [fetchChecklists]);
 
   // Update the hoSoItems with checklists from state
   const hoSoItems = checklists.map(checklist => ({
@@ -206,6 +207,27 @@ const Sidebar = () => {
     }
   };
 
+  const handleNewProfile = async () => {
+    setIsEditDropdownOpen(false); // Close dropdown immediately
+    const title = window.prompt("Nhập tên cho hồ sơ mới của bạn:");
+
+    if (title) {
+      try {
+        const response = await checklistService.createChecklistProfile({ title });
+        const newProfile = response.data;
+        
+        // Refresh the checklist in the sidebar
+        await fetchChecklists();
+
+        // Navigate to the new checklist's page
+        navigate(`/checklist/${newProfile.id}`);
+      } catch (error) {
+        console.error("Failed to create new profile:", error);
+        alert(`Lỗi: ${error.response?.data?.message || error.message || "Không thể tạo hồ sơ mới."}`);
+      }
+    }
+  };
+
   // Placeholder functions for chat item actions
   const handleRenameChat = (chatId) => {
     console.log("Rename chat:", chatId);
@@ -321,9 +343,9 @@ const Sidebar = () => {
               <button onClick={handleNewChat} className="edit-dropdown-item">
                 Đoạn chat mới
               </button>
-              <Link to="/profile/new" className="edit-dropdown-item" onClick={() => setIsEditDropdownOpen(false)}>
+              <button onClick={handleNewProfile} className="edit-dropdown-item">
                 Hồ sơ mới
-              </Link>
+              </button>
             </div>
           )}
         </div>

@@ -16,17 +16,16 @@ const DatePicker = ({ onClose, onDateSelected, selectedDate }) => {
     const datePickerRef = useRef(null);
 
     useEffect(() => {
-        // Parse the selected date and set the initial month and day
-        if (selectedDate) {
-            const parts = selectedDate.split('/');
-            if (parts.length >= 2) {
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
-                const year = parts.length > 2 ? parseInt(parts[2], 10) : new Date().getFullYear();
-                const date = new Date(year, month, day);
-                
-                setCurrentMonth(date);
-                setSelectedDay(day);
+        // If selectedDate is a valid Date object, use it.
+        if (selectedDate && selectedDate instanceof Date && !isNaN(selectedDate)) {
+            setCurrentMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+            setSelectedDay(selectedDate.getDate());
+        } else if (typeof selectedDate === 'string') {
+            // Also handle ISO strings or other parsable date strings
+            const date = new Date(selectedDate);
+            if (!isNaN(date)) {
+                setCurrentMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+                setSelectedDay(date.getDate());
             }
         }
 
@@ -70,10 +69,8 @@ const DatePicker = ({ onClose, onDateSelected, selectedDate }) => {
     // Handle applying the selected date
     const handleApplyDate = () => {
         if (selectedDay) {
-            const day = selectedDay.toString().padStart(2, '0');
-            const month = (currentMonth.getMonth() + 1).toString().padStart(2, '0');
-            const year = currentMonth.getFullYear();
-            onDateSelected(`${day}/${month}/${year}`);
+            const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDay);
+            onDateSelected(newDate);
         }
     };
 

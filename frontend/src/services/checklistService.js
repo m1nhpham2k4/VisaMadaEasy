@@ -1,7 +1,7 @@
 import apiClient from './apiClient';
 import mockChecklistData from './mockChecklistData';
 
-const USE_MOCK_DATA = true; // Toggle between mock data and real API
+const USE_MOCK_DATA = false; // Toggle between mock data and real API
 
 const checklistService = {
     getChecklistProfile: (profileId) => {
@@ -14,7 +14,7 @@ const checklistService = {
             return Promise.resolve({ data: mockChecklistData });
         }
         
-        return apiClient.get(`/api/checklists/profiles/${profileId}`);
+        return apiClient.get(`/checklists/checklist/profile/${profileId}`);
     },
 
     updateChecklistItem: (itemId, data) => {
@@ -32,7 +32,7 @@ const checklistService = {
             return Promise.resolve({ data: { success: true } });
         }
         
-        return apiClient.put(`/api/checklists/items/${itemId}`, data);
+        return apiClient.patch(`/checklists/checklist/item/${itemId}`, data);
     },
     
     updateChecklistProfile: (profileId, data) => {
@@ -45,7 +45,15 @@ const checklistService = {
             return Promise.resolve({ data: { success: true } });
         }
         
-        return apiClient.put(`/api/checklists/profiles/${profileId}`, data);
+        return apiClient.patch(`/checklists/checklist/profile/${profileId}`, data);
+    },
+    
+    // Add new method to create a checklist profile
+    createChecklistProfile: (profileData) => {
+        if (!profileData || !profileData.title) {
+            return Promise.reject(new Error('Profile title is required to create a new checklist profile.'));
+        }
+        return apiClient.post('/checklists/checklist/profile', profileData);
     },
     
     // Add new method to get all checklists (for sidebar)
@@ -62,7 +70,42 @@ const checklistService = {
             });
         }
         
-        return apiClient.get('/api/checklists/profiles');
+        return apiClient.get('/checklists/checklist/profile');
+    },
+    
+    createCategory: (profileId, categoryData) => {
+        if (!profileId || !categoryData || !categoryData.name) {
+            return Promise.reject(new Error('Profile ID and category name are required.'));
+        }
+        return apiClient.post(`/checklists/checklist/profile/${profileId}/category`, categoryData);
+    },
+
+    updateCategory: (categoryId, categoryData) => {
+        if (!categoryId) {
+            return Promise.reject(new Error('Category ID is required.'));
+        }
+        return apiClient.patch(`/checklists/checklist/category/${categoryId}`, categoryData);
+    },
+
+    createItem: (categoryId, itemData) => {
+        if (!categoryId || !itemData || !itemData.task_title) {
+            return Promise.reject(new Error('Category ID and item task title are required.'));
+        }
+        return apiClient.post(`/checklists/checklist/category/${categoryId}/item`, itemData);
+    },
+
+    deleteChecklistItem: (itemId) => {
+        if (!itemId) {
+            return Promise.reject(new Error('Item ID is required to delete checklist item.'));
+        }
+        return apiClient.delete(`/checklists/checklist/item/${itemId}`);
+    },
+
+    deleteCategory: (categoryId) => {
+        if (!categoryId) {
+            return Promise.reject(new Error('Category ID is required to delete category.'));
+        }
+        return apiClient.delete(`/checklists/checklist/category/${categoryId}`);
     }
 };
 

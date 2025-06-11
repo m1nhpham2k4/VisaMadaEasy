@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
-from ..auth.models import User # User model is in auth module
 from .schemas import UserSchema
 from flask_jwt_extended import jwt_required, get_jwt
+from .models import User
 
 user_bp = Blueprint(
     'users', 

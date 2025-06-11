@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import './ChecklistItem.css'; // We will create this CSS file next
 // import rightArrowIcon from '../../assets/icons/checkbox_vector.svg'; // Import checkbox SVG
 import TaskModal from './TaskModal'; // Import the TaskModal component
+import checklistService from '../../services/checklistService'; // Import the service
+import { useToast } from '../../context/ToastContext'; // Import useToast
 
 // Helper function to format date as DD/MM (e.g., 14/4)
 const formatDate = (dateString) => {
@@ -23,10 +25,11 @@ const formatDate = (dateString) => {
     }
 };
 
-const ChecklistItem = ({ item, onToggle, categoryName, onDateChange }) => {
+const ChecklistItem = ({ item, onToggle, categoryName, onTaskUpdate, onTaskDelete }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const fileInputRef = useRef(null);
+    const { showToast } = useToast(); // Get the showToast function
     
     if (!item) {
         return null; // Or some fallback UI
@@ -69,27 +72,37 @@ const ChecklistItem = ({ item, onToggle, categoryName, onDateChange }) => {
         }
     };
 
-    // Placeholder for onToggleStatus prop for TaskModal
-    const handleModalTaskToggleStatus = (taskId, newCompletedState) => {
-        console.log(`TaskModal: Toggling status for task ${taskId} to ${newCompletedState}`);
-        // Call the original onToggle from ChecklistPage to update backend and parent state
-        onToggle(taskId, newCompletedState);
-        // If you need to update the item within ChecklistItem's state or re-fetch, do it here.
-        // For now, we assume onToggle handles the parent state update which will re-render this.
-    };
+    const handleSaveChanges = async (itemId, data) => {
+        try {
+            // Send only the fields that the backend expects
+            const updatePayload = {};
+            
+            // Map the fields correctly
+            if ('title' in data) {
+                updatePayload.title = data.title;
+            }
+            if ('description' in data) {
+                updatePayload.description = data.description;
+            }
+            if ('due_date' in data) {
+                updatePayload.due_date = data.due_date;
+            }
+            if ('is_completed' in data) {
+                updatePayload.is_completed = data.is_completed;
+            }
 
-    // Placeholder for onUpload prop for TaskModal
-    const handleModalTaskUpload = (taskId) => {
-        console.log(`TaskModal: Upload action for task ${taskId}`);
-        // Implement actual upload logic here
-    };
-
-    // Handle date change from TaskModal
-    const handleModalDateChange = (taskId, newDate) => {
-        console.log(`TaskModal: Date changed for task ${taskId} to ${newDate}`);
-        // Pass the change to parent component if onDateChange is provided
-        if (onDateChange) {
-            onDateChange(taskId, newDate);
+            const response = await checklistService.updateChecklistItem(itemId, updatePayload);
+            
+            if (response.data) {
+                showToast('Changes saved successfully!', 'success');
+                // Update the local state with the response data
+                if (onTaskUpdate) {
+                    onTaskUpdate(response.data);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to save changes:', error);
+            showToast(error.response?.data?.error || 'Failed to save changes.', 'error');
         }
     };
 
@@ -129,7 +142,7 @@ const ChecklistItem = ({ item, onToggle, categoryName, onDateChange }) => {
                             className="hidden-checkbox" // Hide the actual checkbox
                         />
                         <span className="custom-checkbox">{checkboxIcon}</span>
-                        <span className={descriptionClassName}>{item.description}</span>
+                        <span className={descriptionClassName}>{item.task_title}</span>
                     </label>
                     
                     <div className="item-actions">
@@ -173,12 +186,11 @@ const ChecklistItem = ({ item, onToggle, categoryName, onDateChange }) => {
                 task={{
                     ...item,
                     category_name: categoryName || 'Không xác định',
-                    details: item.details || '',
                     documents: item.documents || []
                 }}
-                onToggleStatus={handleModalTaskToggleStatus}
-                onUpload={handleModalTaskUpload}
-                onDateChange={handleModalDateChange}
+                onSaveChanges={handleSaveChanges}
+                onTaskUpdate={onTaskUpdate}
+                onTaskDelete={onTaskDelete}
             />
         </>
     );
