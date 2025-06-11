@@ -4,6 +4,7 @@ import checklistService from '../services/checklistService';
 import MainLayout from '../components/layout/MainLayout';
 import ViewDocsHeader from '../components/checklists/viewDocs/ViewDocsHeader';
 import DocumentFolderItem from '../components/checklists/viewDocs/DocumentFolderItem';
+import ConfirmationModal from '../components/common/ConfirmationModal';
 import './ViewDocsPage.css';
 
 const ViewDocsPage = () => {
@@ -11,6 +12,8 @@ const ViewDocsPage = () => {
     const [profileData, setProfileData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [categoryToDelete, setCategoryToDelete] = useState(null);
 
     const fetchProfileData = useCallback(async () => {
         if (!profileId) {
@@ -41,9 +44,25 @@ const ViewDocsPage = () => {
     };
 
     const handleCategoryDelete = (category) => {
-        console.log('Delete action for category:', category.name);
-        alert(`Simulating delete for category: ${category.name}`);
-        // Implement actual delete logic
+        setCategoryToDelete(category);
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!categoryToDelete) return;
+        try {
+            await checklistService.deleteCategory(categoryToDelete.id);
+            setProfileData(prevData => ({
+                ...prevData,
+                categories: prevData.categories.filter(c => c.id !== categoryToDelete.id),
+            }));
+            setShowDeleteConfirm(false);
+            setCategoryToDelete(null);
+        } catch (err) {
+            console.error("Failed to delete category:", err);
+            setError(err.response?.data?.message || 'Failed to delete category.');
+            setShowDeleteConfirm(false);
+        }
     };
 
     const renderDocumentList = () => {
@@ -100,6 +119,19 @@ const ViewDocsPage = () => {
 
     return (
         <MainLayout pageType="checklist"> 
+            <ConfirmationModal
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={confirmDelete}
+                title="Xác nhận xóa"
+            >
+                <p>
+                    Bạn có chắc chắn muốn xóa danh mục này không?{' '}
+                    <strong>"{categoryToDelete?.name}"</strong>?
+                </p>
+                <p>Hành động này không thể hoàn tác và sẽ xóa tất cả các tác vụ và tài liệu liên quan.</p>
+            </ConfirmationModal>
+
             <ViewDocsHeader profileTitle={profileData.title || 'All Documents'} />
             <div className="view-docs-page-content">
                 {renderDocumentList()}

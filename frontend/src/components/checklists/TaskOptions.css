@@ -1,0 +1,48 @@
+.task-options-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  z-index: 1000;
+  background-color: #EDF2FB;
+  border: 2px solid #7C8FBE;
+  border-radius: 16px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.task-option-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: transparent;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: #0F172B;
+}
+
+.task-option-button:hover {
+  background-color: #dbeaff;
+}
+
+.task-option-button.delete {
+  color: #E33838;
+}
+
+.task-option-button.delete .task-option-icon {
+    filter: invert(35%) sepia(81%) saturate(2472%) hue-rotate(335deg) brightness(91%) contrast(95%);
+}
+
+.task-option-icon {
+  width: 20px;
+  height: 20px;
+} 

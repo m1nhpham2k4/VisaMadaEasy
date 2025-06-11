@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify,request
-from .models import User, TokenBlocklist # Will need to be updated to app.auth.models or app.common_models
+from .models import TokenBlocklist
+from ..users.models import User
 from flask_jwt_extended import (
     create_access_token, 
     create_refresh_token, 
@@ -8,7 +9,7 @@ from flask_jwt_extended import (
     current_user,
     get_jwt_identity
 )
-from ..extensions import db, limiter, jwt # Will need to be updated to app.extensions
+from ..extensions import db, limiter, jwt
 from datetime import datetime
 from datetime import timedelta
 import uuid
@@ -16,7 +17,7 @@ import uuid
 
 auth_bp = Blueprint('auth', __name__)
 
-# Class để đại diện cho Guest User (không lưu vào DB)
+# Class to represent a Guest User (not stored in DB)
 class GuestUser:
     def __init__(self, guest_id):
         self.guest_id = guest_id
@@ -26,23 +27,6 @@ class GuestUser:
         self.username = f"guest_{guest_id[:8]}" 
         self.email = None
         self.id = None # Guest không có ID trong database
-
-@jwt.user_lookup_loader # Đăng ký user_lookup_loader với jwt object
-def user_lookup_callback(_jwt_header, jwt_data):
-    """
-    Callback này được Flask-JWT-Extended sử dụng để tải người dùng 
-    từ thông tin trong JWT.
-    """
-    identity = jwt_data["sub"] # 'sub' claim chứa identity (username hoặc guest_id)
-    token_custom_type = jwt_data.get("type") # Claim 'type' tùy chỉnh của chúng ta
-
-    if token_custom_type == "guest":
-        # Nếu là guest token, identity chính là guest_id
-        return GuestUser(guest_id=identity)
-    else:
-        # Nếu là token của người dùng đã đăng ký, identity là username
-        # current_user sẽ là một instance của User model
-        return User.query.filter_by(username=identity).one_or_none() # Will need to be updated
 
 @auth_bp.post('/register')
 @limiter.limit("5 per minute")
@@ -161,25 +145,27 @@ def who_am_i():
 @jwt_required(refresh=True)
 def refresh_token_endpoint():
     """
-    Refreshes an access token.
+    Refreshes an access token and returns a new refresh token.
     Requires a valid JWT refresh token in the Authorization header (Bearer <token>).
     Returns:
-        200: {"access_token": "str"}
+        200: {"access_token": "str", "refresh_token": "str"}
         401: (Handled by Flask-JWT-Extended for missing/invalid/expired refresh token)
     """
     identity = get_jwt_identity()
-    # When refreshing, we also need to know the type of user to create a new access token with the correct claim
-    # The refresh token should also contain the 'type' claim
     jwt_claims = get_jwt()
-    token_custom_type = jwt_claims.get("type") # Get 'type' from refresh token
+    token_custom_type = jwt_claims.get("type")
 
     additional_claims = {}
-    if token_custom_type: # Only add if type exists in refresh token
+    if token_custom_type:
         additional_claims["type"] = token_custom_type
     
     access_token = create_access_token(identity=identity, additional_claims=additional_claims)
+    refresh_token = create_refresh_token(identity=identity, additional_claims=additional_claims)
 
-    return jsonify({"access_token": access_token}), 200
+    return jsonify({
+        "access_token": access_token,
+        "refresh_token": refresh_token
+    }), 200
 
 @auth_bp.get('/logout')
 @jwt_required(verify_type=False) # Accept both access and refresh tokens

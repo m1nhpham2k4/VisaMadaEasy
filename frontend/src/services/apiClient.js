@@ -29,15 +29,53 @@ apiClient.interceptors.request.use(
 // Thêm interceptor để xử lý các lỗi response
 apiClient.interceptors.response.use(
   response => response,
-  error => {
-    // Xử lý lỗi chung - ví dụ: refresh token khi 401, chuyển hướng khi 403, v.v.
+  async error => {
+    const originalRequest = error.config;
+
+    if (error.response.status === 401 && originalRequest.url !== '/auth/refresh' && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+          // Can't refresh, so logout
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('tokenType');
+          localStorage.removeItem('guestId');
+          window.location.href = '/'; // Redirect to landing page
+          return Promise.reject(error);
+        }
+
+        const res = await axios.get(`${API_URL}/auth/refresh`, {
+          headers: { 'Authorization': `Bearer ${refreshToken}` }
+        });
+
+        if (res.status === 200) {
+          localStorage.setItem('accessToken', res.data.access_token);
+          if (res.data.refresh_token) {
+            localStorage.setItem('refreshToken', res.data.refresh_token);
+          }
+          
+          apiClient.defaults.headers.common['Authorization'] = 'Bearer ' + res.data.access_token;
+          originalRequest.headers['Authorization'] = 'Bearer ' + res.data.access_token;
+          
+          return apiClient(originalRequest);
+        }
+      } catch (refreshError) {
+        // Refresh failed, logout
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('tokenType');
+        localStorage.removeItem('guestId');
+        window.location.href = '/'; // Redirect to landing page
+        return Promise.reject(refreshError);
+      }
+    }
+
     if (error.response) {
-      // Xử lý dựa trên mã lỗi
+      // Handle other errors if needed
       switch (error.response.status) {
-        case 401:
-          // Có thể xử lý refresh token hoặc đăng xuất
-          console.log('Lỗi xác thực - có thể yêu cầu đăng nhập lại');
-          break;
         case 403:
           console.log('Không có quyền truy cập');
           break;

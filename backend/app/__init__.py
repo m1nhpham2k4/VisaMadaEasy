@@ -9,12 +9,12 @@ from config import config as app_config # Direct import assuming backend/ is the
 # Import extensions from app.extensions
 from .extensions import db, jwt, limiter, migrate
 
-# Import User and TokenBlocklist for JWT handlers
-# These will need to be adjusted if the models are moved/renamed
-from .auth.models import User, TokenBlocklist 
-from .auth.routes import GuestUser # Import GuestUser for user_lookup_loader
-
-from app.checklists import models as checklist_models
+# Define the function to check if a token is in blocklist for easier patching in tests
+def check_if_token_in_blocklist(jwt_header, jwt_data):
+    from .auth.models import TokenBlocklist
+    jti = jwt_data['jti']
+    token = TokenBlocklist.query.filter_by(jti=jti).scalar()
+    return token is not None
 
 def create_app(config_name=None):
     if config_name is None:
@@ -45,23 +45,37 @@ def create_app(config_name=None):
     jwt.init_app(app)
     limiter.init_app(app)
     migrate.init_app(app, db)
-
+    
+    # Import models after initializing db to avoid circular imports
+    from .users.models import User
+    from .auth.models import TokenBlocklist
+    from app.checklists import models as checklist_models
+    
     # Register Blueprints
     from .auth.routes import auth_bp
     from .chat.routes import chat_bp
     from .users.routes import user_bp
+    from .checklists.routes import checklist_bp
     # from .main_routes import main_bp # If you have general routes
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(chat_bp, url_prefix='/chat')
     app.register_blueprint(user_bp, url_prefix='/users')
-#    app.register_blueprint(checklist_bp, url_prefix='/checklists')
+    app.register_blueprint(checklist_bp, url_prefix='/checklists')
 
     # JWT Configuration and handlers
-    # user_loader_callback is now in auth.routes.py and registered with jwt object there.
-    # We need to ensure that auth.routes is imported so that the decorator runs.
-    # The @jwt.user_lookup_loader in auth_bp should handle this.
-    # Re-defining it here would be redundant if it's already set on the jwt object via the blueprint.
+    # We need to import GuestUser here, but after the User model is known
+    from .auth.routes import GuestUser
+    
+    @jwt.user_lookup_loader
+    def user_lookup_callback(_jwt_header, jwt_data):
+        identity = jwt_data["sub"]
+        token_custom_type = jwt_data.get("type")
+
+        if token_custom_type == "guest":
+            return GuestUser(guest_id=identity)
+        else:
+            return User.query.filter_by(username=identity).one_or_none()
 
     # JWT error handlers (moved from original main.py)
     @jwt.expired_token_loader
@@ -77,11 +91,8 @@ def create_app(config_name=None):
     def missing_token_callback(error):
         return jsonify({"message": "Request does not contain an access token", "error": "authorization_required"}), 401
     
-    @jwt.token_in_blocklist_loader
-    def check_if_token_in_blocklist(jwt_header, jwt_data):
-        jti = jwt_data['jti']
-        token = TokenBlocklist.query.filter_by(jti=jti).scalar()
-        return token is not None
+    # Use the standalone function for token blocklist check
+    jwt.token_in_blocklist_loader(check_if_token_in_blocklist)
     
     # A simple route to check if the app is up
     @app.route('/health')

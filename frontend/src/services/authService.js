@@ -1,4 +1,7 @@
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import apiClient from './apiClient';
+
+const AuthContext = createContext(null);
 
 // Service functions
 const authService = {
@@ -76,9 +79,11 @@ const authService = {
       return response.data.user_info; // Backend trả về user_info { type, id/guest_id, username, email? }
     } catch (error) {
       console.error('Get current user error:', error.response?.data || error.message);
-      // If token is invalid (e.g. expired), may need to logout here
-      if (error.response && (error.response.status === 401 || error.response.status === 422)) {
-         // 422 Unprocessable Entity có thể được trả về bởi flask-jwt-extended nếu token sai định dạng
+      // The new interceptor in apiClient will handle 401 errors (token refresh or logout).
+      // No need to call logout from here anymore for 401.
+      // We might still want to logout for other specific errors if needed.
+      if (error.response && error.response.status === 422) {
+         // 422 might still indicate a malformed token that won't be a 401
          await authService.logout(); // delete invalid token
       }
       return null; // Or throw error depending on how component handles this
@@ -108,6 +113,72 @@ const authService = {
       throw error;
     }
   }
+};
+
+export const AuthProvider = ({ children }) => {
+    const [user, setUser] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const checkUser = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const currentUser = await authService.getCurrentUser();
+            if (currentUser) {
+                setUser(currentUser);
+                setIsAuthenticated(authService.isAuthenticated());
+            } else {
+                setUser(null);
+                setIsAuthenticated(false);
+            }
+        } catch (error) {
+            setUser(null);
+            setIsAuthenticated(false);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        checkUser();
+    }, [checkUser]);
+
+    const login = async (email, password) => {
+        const response = await authService.login(email, password);
+        await checkUser();
+        return response;
+    };
+
+    const logout = async () => {
+        await authService.logout();
+        await checkUser();
+    };
+    
+    const initiateGuestSession = async () => {
+        const response = await authService.initiateGuestSession();
+        await checkUser();
+        return response;
+    };
+
+    const value = {
+        user,
+        isAuthenticated,
+        isLoading,
+        login,
+        logout,
+        initiateGuestSession,
+        register: authService.register,
+    };
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (!context) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
 };
 
 export default authService;
