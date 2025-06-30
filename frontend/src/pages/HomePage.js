@@ -5,9 +5,13 @@ import TopBar from '../components/layout/TopBar'; // Import the TopBar component
 import authService from '../services/authService'; // Import authService
 import apiClient from '../services/apiClient'; // Import apiClient
 import TextInputField from '../components/layout/TextInputField'; // Import TextInputField
+import Checkbox from '../components/common/Checkbox/Checkbox'; // Import Checkbox
 import unlockIcon from '../assets/icons/unlock.svg';
 import checkboxShapeIcon from '../assets/icons/checkbox_shape.svg'; // Import checkbox shape
 import checkboxVectorIcon from '../assets/icons/checkbox_vector.svg'; // Import checkbox vector (tick)
+import TaskModal from '../components/checklists/TaskModal'; // Import the TaskModal
+import { useToast } from '../context/ToastContext'; // Import useToast
+import checklistService from '../services/checklistService'; // Import checklistService
 import '../App.css';
 
 // --- HomePage for GUEST users (default view) ---
@@ -33,7 +37,7 @@ function HomePageGuestView() {
         console.log("No active guest session for chat, initiating...");
         await authService.initiateGuestSession();
         setGuestSessionInitiatedForChat(true); // Đánh dấu đã khởi tạo
-        // Sau khi khởi tạo, token mới đã được lưu vào localStorage bởi authService
+        // Sau khi khởi tạo, token mới được lưu vào localStorage bởi authService
         // Interceptor của axios sẽ tự động gắn token này vào request tiếp theo
       } catch (error) {
         console.error("Failed to initiate guest session for chat:", error);
@@ -48,7 +52,7 @@ function HomePageGuestView() {
     // give time for the backend to initialize the session if needed
     setTimeout(() => {
       // Navigate to chatbot page with the input
-      navigate('/chatbot', { state: { initialMessage: chatInput } });
+      navigate('/chat', { state: { initialMessage: chatInput } });
     }, 500); // Increased from 400ms to 500ms for smoother transition
   };
 
@@ -132,23 +136,40 @@ function HomePageGuestView() {
 }
 
 // --- HomePage for REGISTERED users (kept for later use) ---
-// Placeholder data - replace with actual data later
-const sampleTasksRegistered = [
-  { id: 1, name: 'Hộ chiếu', dueDate: 'Ngày mai', completed: false },
-  { id: 2, name: 'Bằng tốt nghiệp đại h...', dueDate: '14/4', completed: false },
-  { id: 3, name: 'Bằng điểm đại học', dueDate: '14/4', completed: false },
-  { id: 4, name: 'Ảnh thẻ', dueDate: '14/4', completed: false },
-  { id: 5, name: 'Xác nhận lương', dueDate: '16/4', completed: false },
-  { id: 6, name: 'Lý lịch tư pháp số 2', dueDate: '20/4', completed: false },
-];
-
 function HomePageForRegisteredUserView() { // Renamed component
   const [chatInput, setChatInput] = useState('');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [pinnedChats, setPinnedChats] = useState([]);
   const [isLoadingPinned, setIsLoadingPinned] = useState(false);
-  // Add state for active task tab if needed, e.g., const [activeTaskTab, setActiveTaskTab] = useState('Cần hoàn thành');
-  const navigate = useNavigate(); // Add useNavigate hook
+  const [categorizedTasks, setCategorizedTasks] = useState({ pending: [], overdue: [], done: [] });
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true); // Start with loading true
+  const [activeTab, setActiveTab] = useState('pending'); // 'pending', 'overdue', 'done'
+  const [selectedTask, setSelectedTask] = useState(null); // State for the selected task
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false); // State for modal visibility
+  const { showToast } = useToast(); // Destructure showToast from useToast
+  const navigate = useNavigate();
+
+  // Fetch all categorized tasks once on component mount
+  useEffect(() => {
+    const fetchAllTasks = async () => {
+      setIsLoadingTasks(true);
+      try {
+        const response = await apiClient.get('/checklists/my-tasks');
+        // Set state, providing default empty arrays if a category is missing
+        setCategorizedTasks({
+          pending: response.data.pending || [],
+          overdue: response.data.overdue || [],
+          done: response.data.done || []
+        });
+      } catch (error) {
+        console.error('Error fetching categorized tasks:', error);
+        setCategorizedTasks({ pending: [], overdue: [], done: [] }); // Reset on error
+      } finally {
+        setIsLoadingTasks(false);
+      }
+    };
+    fetchAllTasks();
+  }, []); // Empty dependency array means this runs only once
 
   // Fetch pinned chats when component mounts
   useEffect(() => {
@@ -218,143 +239,271 @@ function HomePageForRegisteredUserView() { // Renamed component
     // Add slightly longer delay for smoother transition
     setTimeout(() => {
       // Navigate to chatbot page with the input
-      navigate('/chatbot', { state: { initialMessage: chatInput } });
+      navigate('/chat', { state: { initialMessage: chatInput } });
     }, 500); // Increased from 400ms to 500ms for smoother transition
   };
 
+  const formatDueDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (date.toDateString() === today.toDateString()) return 'Hôm nay';
+    if (date.toDateString() === tomorrow.toDateString()) return 'Ngày mai';
+    
+    const diffDays = Math.ceil((date - today) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 0) return `Còn ${diffDays} ngày`;
+    if (diffDays === 0) return 'Hết hạn hôm nay'; // Should be covered by 'Hôm nay' but as a fallback
+    return `Quá hạn ${-diffDays} ngày`;
+  };
+  
+  const handleOpenTaskModal = (task) => {
+    // 1. Optimistically set the task and open the modal immediately
+    setSelectedTask(task);
+    setIsTaskModalOpen(true);
+
+    // 2. Fetch fresh data in the background to update the view if needed
+    checklistService.getChecklistItem(task.id)
+      .then(response => {
+        // Update the state with the fresh data
+        setSelectedTask(response.data);
+      })
+      .catch(error => {
+        // If the background fetch fails, the user can still interact with the
+        // potentially stale data. We can show a non-intrusive toast.
+        console.error("Background task refresh failed:", error);
+        showToast('Could not refresh task details.', 'warning');
+      });
+  };
+
+  const handleCloseTaskModal = () => {
+    setSelectedTask(null);
+    setIsTaskModalOpen(false);
+  };
+
+  const handleTaskUpdate = (updatedTask) => {
+    // This function handles the re-categorization of a task when its state (e.g., is_completed) changes.
+    // It's used both for optimistic updates and for updates coming from the modal.
+    setCategorizedTasks(prev => {
+        let newPending = [...prev.pending];
+        let newOverdue = [...prev.overdue];
+        let newDone = [...prev.done];
+
+        // Find and remove the task from all lists first
+        newPending = newPending.filter(t => t.item_id !== updatedTask.item_id);
+        newOverdue = newOverdue.filter(t => t.item_id !== updatedTask.item_id);
+        newDone = newDone.filter(t => t.item_id !== updatedTask.item_id);
+
+        // Add the updated task to the correct list
+        if (updatedTask.is_completed) {
+            newDone.unshift(updatedTask);
+        } else {
+            // Here you could add logic to check if it's overdue
+            // For now, it goes back to pending.
+            newPending.unshift(updatedTask);
+        }
+
+        return { pending: newPending, overdue: newOverdue, done: newDone };
+    });
+  };
+
+  const handleToggleTaskCompletion = async (task) => {
+    // Create a version of the task as it will be after the update
+    const updatedTask = { ...task, is_completed: !task.is_completed };
+
+    // 1. Optimistic UI update
+    handleTaskUpdate(updatedTask);
+    
+    try {
+        // 2. API call in the background
+        await checklistService.updateChecklistItem(task.item_id, { is_completed: updatedTask.is_completed });
+        // On success, the UI is already correct. We could show a toast if desired.
+    } catch (error) {
+        console.error("Failed to update task status:", error);
+        showToast('Could not update task status. Please try again.', 'error');
+        // 3. Revert on failure
+        handleTaskUpdate(task); // Pass the original task to revert the UI
+    }
+  };
+
+  const handleTaskDelete = (deletedTaskId) => {
+    // Filter out the deleted task from all categories
+    setCategorizedTasks(prev => ({
+      pending: prev.pending.filter(t => t.item_id !== deletedTaskId),
+      overdue: prev.overdue.filter(t => t.item_id !== deletedTaskId),
+      done: prev.done.filter(t => t.item_id !== deletedTaskId),
+    }));
+  };
+
   return (
-    <div className={`home-registered-main-container ${isTransitioning ? 'transitioning' : ''}`} style={{ display: 'flex', height: '100vh' }}>
-      <Sidebar />
-      <main className={`home-main-content-area ${isTransitioning ? 'fade-out' : ''}`} style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        {/* TopBar will be sticky within this main area */}
-        <TopBar isLoggedIn={true} pageType="default" /> {/* pageType="default" for logged-in homepage */}
-        <div 
-          className="main-content-inner-wrapper" 
-          style={{
-            paddingLeft: '20px', 
-            paddingTop: '70px', /* Adjust based on actual TopBar height */
-            flexGrow: 1, 
-            display: 'flex', 
-            flexDirection: 'column',
-            // justifyContent: 'center', // Center content vertically in the remaining space
-            // alignItems: 'center' // Center content horizontally
-          }}
-        >
-          <section 
-            className="chat-interaction-section main-chat-area"
+    <>
+      <div className={`home-registered-main-container ${isTransitioning ? 'transitioning' : ''}`} style={{ display: 'flex', height: '100vh' }}>
+        <Sidebar />
+        <main className={`home-main-content-area ${isTransitioning ? 'fade-out' : ''}`} style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          {/* TopBar will be sticky within this main area */}
+          <TopBar isLoggedIn={true} pageType="default" /> {/* pageType="default" for logged-in homepage */}
+          <div 
+            className="main-content-inner-wrapper" 
             style={{
-              display: 'flex',
+              paddingLeft: '20px', 
+              paddingTop: '70px', /* Adjust based on actual TopBar height */
+              flexGrow: 1, 
+              display: 'flex', 
               flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              textAlign: 'center',
-              flexGrow: 1 // Allow this section to take available space for centering
+              // justifyContent: 'center', // Center content vertically in the remaining space
+              // alignItems: 'center' // Center content horizontally
             }}
           >
-            <h1 className="chat-main-heading" style={{ fontSize: '2rem', marginBottom: '-1.5rem', marginRight: '1rem' }}>Mình có thể giúp gì cho bạn?</h1>
-            <div className={`home-chat-input-container ${isTransitioning ? 'sliding-input' : ''}`} style={{ width: '130%', marginLeft: '4rem' }}>
-              <TextInputField
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Hỏi mình về hồ sơ du học nè"
-                onSend={handleChatSubmitRegistered}
-                variant="home"
-              />
-            </div>
-            <div className={`prompt-buttons-container ${isTransitioning ? 'fade-out' : ''}`} style={{ marginTop: '1rem' }}>
-              <button className="prompt-button">Tra cứu</button>
-              <button className="prompt-button">Kiểm tra tiến độ</button>
-              <button className="prompt-button">Cập nhật thông tin</button>
-              <button className="prompt-button">Tóm tắt văn bản</button>
-            </div>
-          </section>
-          {/* The user-tasks-pinned-chats-container will now be below the centered chat section */}
-          {/* If this also needs specific layout, it can be adjusted */}
-          <section className={`user-tasks-pinned-chats-container ${isTransitioning ? 'fade-out' : ''}`}>
-            <div className="my-tasks-section">
-              <h2 className="section-title-main">Việc của tôi</h2>
-              <div className="task-tabs-container">
-                <button className="task-tab active">Cần hoàn thành</button>
-                <button className="task-tab">Quá hạn</button>
-                <button className="task-tab">Đã hoàn thành</button>
+            <section 
+              className="chat-interaction-section main-chat-area"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                textAlign: 'center',
+                flexGrow: 1 // Allow this section to take available space for centering
+              }}
+            >
+              <h1 className="chat-main-heading" style={{ fontSize: '2rem', marginBottom: '-1.5rem', marginRight: '1rem' }}>Mình có thể giúp gì cho bạn?</h1>
+              <div className={`home-chat-input-container ${isTransitioning ? 'sliding-input' : ''}`} style={{ width: '130%', marginLeft: '4rem' }}>
+                <TextInputField
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Hỏi mình về hồ sơ du học nè"
+                  onSend={handleChatSubmitRegistered}
+                  variant="home"
+                />
               </div>
-              <ul className="tasks-list-container">
-                {sampleTasksRegistered.map(task => (
-                  <li key={task.id} className="task-item">
-                    <div className="task-info">
-                      <span className="checkmark-icon-placeholder task-checkbox"></span>
-                      <span className="task-name">{task.name}</span>
-                    </div>
-                    <div className="task-due-date">
-                      <span>{task.dueDate}</span>
-                      <span className="icon-placeholder-sidebar arrow-right-icon"></span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="pinned-chats-section">
-              <h2 className="section-title-main">Đoạn chat đã ghim</h2>
-              <ul className="pinned-chats-list-container">
-                {isLoadingPinned ? (
-                  <p>Đang tải...</p>
-                ) : pinnedChats.length > 0 ? (
-                  pinnedChats.map(chat => (
-                  <li key={chat.id} className="pinned-chat-item">
-                      <Link to={`/chat/${chat.id}`} className="pinned-chat-link">
-                    <span className="pinned-chat-title">{chat.title}</span>
-                    <span className="pinned-chat-date">{chat.date}</span>
-                      </Link>
-                  </li>
-                  ))
-                ) : (
-                  <p className="no-pinned-chats">Chưa có đoạn chat nào được ghim</p>
-                )}
-              </ul>
-            </div>
-          </section>
-        </div> 
-      </main>
-    </div>
+              <div className={`prompt-buttons-container ${isTransitioning ? 'fade-out' : ''}`} style={{ marginTop: '1rem' }}>
+                <button className="prompt-button">Tra cứu</button>
+                <button className="prompt-button">Kiểm tra tiến độ</button>
+                <button className="prompt-button">Cập nhật thông tin</button>
+                <button className="prompt-button">Tóm tắt văn bản</button>
+              </div>
+            </section>
+            {/* The user-tasks-pinned-chats-container will now be below the centered chat section */}
+            {/* If this also needs specific layout, it can be adjusted */}
+            <section className={`user-tasks-pinned-chats-container ${isTransitioning ? 'fade-out' : ''}`}>
+              <div className="my-tasks-section">
+                <div className="section-header">
+                  <h2 className="section-title-main">
+                    Việc của tôi
+                  </h2>
+                </div>
+                
+                <div className="task-tabs-container">
+                  <button className={`task-tab ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>
+                    Cần hoàn thành ({categorizedTasks.pending.length})
+                  </button>
+                  <button className={`task-tab ${activeTab === 'overdue' ? 'active' : ''}`} onClick={() => setActiveTab('overdue')}>
+                    Quá hạn ({categorizedTasks.overdue.length})
+                  </button>
+                  <button className={`task-tab ${activeTab === 'done' ? 'active' : ''}`} onClick={() => setActiveTab('done')}>
+                    Đã hoàn thành ({categorizedTasks.done.length})
+                  </button>
+                </div>
+                <ul className="tasks-list-container">
+                   {isLoadingTasks ? (
+                    <p>Đang tải công việc...</p>
+                  ) : categorizedTasks[activeTab] && categorizedTasks[activeTab].length > 0 ? (
+                    categorizedTasks[activeTab].map(task => {
+                      // The task object from the API has 'item_id' and 'item_title'.
+                      // We'll create a new object for the modal to avoid confusion.
+                      const modalTaskObject = {
+                        id: task.item_id,
+                        task_title: task.item_title,
+                        description: task.description,
+                        due_date: task.due_date,
+                        is_completed: task.is_completed, // Use the direct value
+                        documents: task.documents || [],
+                        // Add any other properties the modal expects
+                      };
+
+                      return (
+                        <li key={task.item_id} className={`task-item ${task.is_completed ? 'task-completed' : ''}`}>
+                          <div 
+                            className="task-link-wrapper" 
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', cursor: 'pointer' }}
+                            onClick={() => handleOpenTaskModal(modalTaskObject)}
+                          >
+                            <div className="task-info" style={{ display: 'flex', alignItems: 'center' }}>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Checkbox 
+                                  checked={task.is_completed} 
+                                  onChange={() => handleToggleTaskCompletion(task)} 
+                                />
+                              </div>
+                              <span className="task-name" style={{ marginLeft: '8px' }}>{task.item_title}</span>
+                            </div>
+                            <div className="task-due-date" style={{ display: 'flex', alignItems: 'center' }}>
+                              <span>{formatDueDate(task.due_date)}</span>
+                              <span className="icon-placeholder-sidebar arrow-right-icon"></span>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })
+                  ) : (
+                    <p>Không có công việc nào.</p>
+                  )}
+                </ul>
+              </div>
+              <div className="pinned-chats-section">
+                <h2 className="section-title-main">Đoạn chat đã ghim</h2>
+                <ul className="pinned-chats-list-container">
+                   {isLoadingPinned ? (
+                    <p>Đang tải...</p>
+                  ) : pinnedChats.length > 0 ? (
+                     pinnedChats.map(chat => (
+                    <li key={chat.id} className="pinned-chat-item">
+                        <Link to={`/chat/${chat.id}`} className="pinned-chat-link">
+                             <span className="pinned-chat-title">{chat.title}</span>
+                             <span className="pinned-chat-date">{chat.date}</span>
+                         </Link>
+                    </li>
+                     ))
+                  ) : (
+                    <p className="no-pinned-chats">Chưa có đoạn chat nào được ghim</p>
+                  )}
+                </ul>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+      <TaskModal
+        isOpen={isTaskModalOpen}
+        onClose={handleCloseTaskModal}
+        task={selectedTask}
+        onTaskUpdate={handleTaskUpdate}
+        onTaskDelete={handleTaskDelete}
+      />
+    </>
   );
 }
 
-// --- Main HomePage Component to decide which view to render ---
+// --- Main HomePage Component ---
 function HomePage() {
-  // State để lưu thông tin người dùng/guest và trạng thái loading
-  const [currentUserInfo, setCurrentUserInfo] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [userStatus, setUserStatus] = useState('loading'); // 'loading', 'guest', 'registered'
 
   useEffect(() => {
     const fetchUserStatus = async () => {
-      setIsLoading(true);
-      try {
-        const userInfo = await authService.getCurrentUser(); // Hàm này gọi /auth/whoami
-        setCurrentUserInfo(userInfo); // userInfo có thể là null, hoặc { type: 'guest', ... }, hoặc { type: 'registered', ... }
-      } catch (error) {
-        // Lỗi có thể đã được xử lý trong getCurrentUser (ví dụ: tự logout nếu token lỗi)
-        console.error("Error fetching user status in HomePage:", error);
-        setCurrentUserInfo(null); // Đảm bảo là null nếu có lỗi
-      }
-      setIsLoading(false);
+      const status = await authService.getUserStatus();
+      setUserStatus(status);
     };
 
     fetchUserStatus();
-  }, []); // Chạy một lần khi component mount
+  }, []);
 
-  if (isLoading) {
-    return <div>Loading...</div>; // Hoặc một spinner component đẹp hơn
+  if (userStatus === 'loading') {
+    return <div>Loading...</div>; // Or a proper loading spinner
   }
 
-  // Dựa vào currentUserInfo.type để quyết định view nào sẽ render
-  if (currentUserInfo && currentUserInfo.type === 'registered') {
-    return <HomePageForRegisteredUserView />;
-  } else {
-    // Bao gồm cả trường hợp currentUserInfo là null (chưa có session nào)
-    // hoặc currentUserInfo.type === 'guest' (đã có guest session từ trước, ví dụ từ LoginForm)
-    return <HomePageGuestView />;
-  }
+  return userStatus === 'registered' ? <HomePageForRegisteredUserView /> : <HomePageGuestView />;
 }
 
-// Export HomePage chính thay vì HomePageGuestView
 export default HomePage;

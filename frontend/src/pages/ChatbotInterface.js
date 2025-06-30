@@ -6,6 +6,8 @@ import TextInputField from '../components/layout/TextInputField'; // Import the 
 import '../Chatbot.css'; // Adjusted path to import Chatbot.css
 import arrowDropDownIconSVG from '../assets/landing_page_icons/arrow_drop_down.svg'; // Import the SVG
 import chatService from '../services/chatService';
+import checklistService from '../services/checklistService';
+import { useChecklist } from '../context/ChecklistContext';
 import apiClient from '../services/apiClient'; // Added for fetching session messages
 import { marked } from 'marked'; //use for convert markdown to html
 import authService from '../services/authService'; // Added for view switching
@@ -44,10 +46,12 @@ const ChatbotRegisteredUserView = ({ fadeInClass }) => {
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState(null);
   const [currentSessionId, setCurrentSessionId] = useState(null); // Renamed from sessionId for clarity
+  const [initialMessageToSend, setInitialMessageToSend] = useState(null); // Track initial message to send
   const messagesEndRef = useRef(null);
   const location = useLocation();
   const { sessionId: sessionIdFromUrl } = useParams(); // Get sessionId from URL
   const hasSentInitialMessageRef = useRef(false);
+  const { refreshChecklists } = useChecklist();
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
@@ -89,7 +93,6 @@ const ChatbotRegisteredUserView = ({ fadeInClass }) => {
       console.log("Loading session from URL:", sessionIdFromUrl);
       loadSessionMessages(sessionIdFromUrl);
       // Reset initial message flag if we are loading a session
-      hasSentInitialMessageRef.current = true; 
     } else {
       // If no sessionIdFromUrl, it's a new chat or navigated away from a session
       // Reset relevant states for a new chat scenario if needed
@@ -99,62 +102,92 @@ const ChatbotRegisteredUserView = ({ fadeInClass }) => {
           setCurrentSessionId(null);
           // Error and isLoading should be handled by other flows or reset as needed
       }
-      hasSentInitialMessageRef.current = false; // Allow initial message to be sent if it comes via state
+      // DON'T reset hasSentInitialMessageRef here to prevent double sending
+      // hasSentInitialMessageRef.current = false; // Commented out to prevent race condition
     }
   }, [sessionIdFromUrl]); // Rerun when sessionIdFromUrl changes
 
   // Effect to handle initial message from HomePage (e.g., from a prompt button)
-  // This should only run if no specific chat session is loaded via URL.
   useEffect(() => {
-    if (!sessionIdFromUrl && location.state?.initialMessage && !hasSentInitialMessageRef.current) {
-      hasSentInitialMessageRef.current = true; // Mark as sent
+    if (!sessionIdFromUrl && location.state?.initialMessage) {
       const messageFromHome = location.state.initialMessage;
-      setInputValue(messageFromHome); // Set for display, though handleSend will use the direct value
-      
-      // Directly call handleSend. It will use currentSessionId (which should be null for a new chat).
-      handleSend(messageFromHome); 
+
+      // Set input value for display
+      setInputValue(messageFromHome);
+
+      // Only set the message to send if this is the first time
+      if (!hasSentInitialMessageRef.current) {
+        hasSentInitialMessageRef.current = true;
+
+        // Clear location.state immediately to prevent re-triggering on future navigation events
+        window.history.replaceState({}, document.title);
+
+        // Set the initial message to be sent
+        setInitialMessageToSend(messageFromHome);
+      }
     }
-    // Clear location.state to prevent re-triggering on navigation or re-renders
-    // This is a common pattern but be cautious if other parts of your app rely on this state persisting.
-    if (location.state?.initialMessage) {
-      window.history.replaceState({}, document.title) // Clears state without reloading
+  }, []); // Empty dependency array means this only runs once when component mounts
+
+  // Effect to send the initial message after it's set
+  useEffect(() => {
+    if (initialMessageToSend) {
+      handleSend(initialMessageToSend);
+      setInitialMessageToSend(null); // Clear after sending
     }
-  }, [location.state, sessionIdFromUrl, currentSessionId]); // Added currentSessionId dependency
+  }, [initialMessageToSend]); // Trigger when initialMessageToSend changes
 
   const handleSend = async (messageText) => {
     const textToSend = typeof messageText === 'string' ? messageText : inputValue;
     if (textToSend.trim() === '') return;
-    
+
     const userMessage = { sender: 'user', text: textToSend };
     setChatHistory(prev => [...prev, userMessage]);
-    
+
     if (typeof messageText !== 'string') {
-        setInputValue(''); 
+        setInputValue('');
     }
     setIsLoading(true);
     setError(null);
 
+    const lastMessage = chatHistory[chatHistory.length - 1];
+    if (textToSend.toLowerCase().includes('yes') && lastMessage && lastMessage.isChecklistPrompt) {
+        try {
+            await checklistService.generateChecklistFromPrompt(lastMessage.prompt);
+            refreshChecklists();
+            setChatHistory(prev => [...prev, { text: 'Done! Your checklist has been created.', sender: 'bot' }]);
+        } catch (error) {
+            setChatHistory(prev => [...prev, { text: 'Sorry, I couldn\'t create the checklist.', sender: 'bot' }]);
+        } finally {
+            setIsLoading(false);
+        }
+        return;
+    }
+
     try {
       // chatService.sendMessage now correctly uses currentSessionId (which might be from URL or new)
-      const data = await chatService.sendMessage(textToSend, currentSessionId); 
-      
+      const data = await chatService.sendMessage(textToSend, currentSessionId);
+
       if (data.session_id && !currentSessionId) { // If it was a new chat, a session_id is returned
         setCurrentSessionId(data.session_id);
         // Emit custom event for sidebar to refresh with new data
-        const newChatEvent = new CustomEvent('newChatSessionCreated', { 
-          detail: { sessionId: data.session_id, title: textToSend.substring(0, 50) } 
+        const newChatEvent = new CustomEvent('newChatSessionCreated', {
+          detail: { sessionId: data.session_id, title: textToSend.substring(0, 50) }
         });
         window.dispatchEvent(newChatEvent);
-        
+
         // Navigate to the new chat URL to update the URL bar
-        // This is now safe to uncomment, as we've fixed the routes and sidebar integration
-        window.history.pushState({}, '', `/chat/${data.session_id}`);
+        // Use replaceState instead of pushState to avoid triggering useEffect again
+        window.history.replaceState({}, '', `/chat/${data.session_id}`);
       }
-      
-      setChatHistory(prev => [...prev, { 
-        sender: 'bot', 
-        text: data.reply 
-      }]);
+
+      const botResponse = { sender: 'bot', text: data.reply };
+      // A simple way to detect a checklist prompt
+      if (data.reply.toLowerCase().includes('would you like to create a checklist')) {
+          botResponse.isChecklistPrompt = true;
+          botResponse.prompt = textToSend;
+      }
+
+      setChatHistory(prev => [...prev, botResponse]);
     } catch (err) {
       console.error('Lỗi gửi tin nhắn:', err);
       const errorMessage = err.response?.data?.error || err.message || 'Không thể kết nối với chatbot. Vui lòng thử lại sau.';
@@ -212,7 +245,7 @@ const ChatbotRegisteredUserView = ({ fadeInClass }) => {
                 key={`message-${turnIndex}-${messageIndex}`}
                 style={{ 
                   marginLeft: 'auto', // Push to the right side
-                  marginRight: '10px',
+                  marginRight: '40px',
                   textAlign: 'right',
                   maxWidth: '70%'
                 }}
@@ -255,7 +288,7 @@ const ChatbotRegisteredUserView = ({ fadeInClass }) => {
                   marginRight: 'auto', // Push to the left side
                   marginLeft: '10px',
                   textAlign: 'left',
-                  maxWidth: '70%'
+                  maxWidth: '100%'
                 }}
               >
                 <div className="bot-message-group">
@@ -347,13 +380,13 @@ function ChatbotGuestView() {
     if (location.state?.initialMessage && messages.length === 0 && !hasSentInitialMessageGuestRef.current) { 
       hasSentInitialMessageGuestRef.current = true; 
       const initialMsgFromHome = location.state.initialMessage;
-      handleChatSubmit(initialMsgFromHome); 
+
+      // Clear location.state for guest view as well
+      window.history.replaceState({}, document.title);
+      
+      handleChatSubmit(initialMsgFromHome);
     }
-    // Clear location.state for guest view as well
-    if (location.state?.initialMessage) {
-      window.history.replaceState({}, document.title)
-    }
-  }, [location.state, messages.length, sessionId]);
+  }, [location.state]); // Removed messages.length and sessionId from dependencies
 
   useEffect(() => {
     if (messagesEndRef.current && messages.length > 0) { // Only scroll if there are messages
@@ -497,7 +530,7 @@ function ChatbotGuestView() {
                         marginLeft: 'auto', 
                         marginRight: '10px', 
                         textAlign: 'right', 
-                        maxWidth: '70%', 
+                        maxWidth: '100%', 
                         marginBottom: '10px' // Add some spacing between messages
                       }}
                     >
@@ -514,7 +547,7 @@ function ChatbotGuestView() {
                         marginRight: 'auto', 
                         marginLeft: '10px', 
                         textAlign: 'left', 
-                        maxWidth: '70%', 
+                        maxWidth: '100%', 
                         marginBottom: '10px' // Add some spacing between messages
                       }}
                     >
@@ -529,7 +562,7 @@ function ChatbotGuestView() {
                 }
               })}
               {isLoading && (
-                <div className="bot-response-container loading" style={{ marginRight: 'auto', marginLeft: '10px', textAlign: 'left', maxWidth: '70%', marginBottom: '10px'}}>
+                <div className="bot-response-container loading" style={{ marginRight: 'auto', marginLeft: '10px', textAlign: 'left', maxWidth: '100%', marginBottom: '10px'}}>
                   <div className="bot-message-group">
                     <div className="bot-message-text">
                       <div className="typing-indicator">
@@ -542,7 +575,7 @@ function ChatbotGuestView() {
                 </div>
               )}
               {error && !messages.some(msg => msg.text.includes('Xin lỗi, đã có lỗi xảy ra')) && (
-                <div className="bot-response-container error" style={{ marginRight: 'auto', marginLeft: '10px', textAlign: 'left', maxWidth: '70%', marginBottom: '10px'}}>
+                <div className="bot-response-container error" style={{ marginRight: 'auto', marginLeft: '10px', textAlign: 'left', maxWidth: '100%', marginBottom: '10px'}}>
                   <div className="bot-message-group">
                     <p className="bot-message-text error-text">{error}</p>
                   </div>

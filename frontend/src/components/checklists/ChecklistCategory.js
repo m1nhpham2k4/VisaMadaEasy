@@ -5,7 +5,7 @@ import './ChecklistCategory.css'; // We will create this CSS file next
 import checklistService from '../../services/checklistService';
 import { useToast } from '../../context/ToastContext';
 
-const ChecklistCategory = ({ category, onTaskToggle, onDateChange, onAddItem, onCategoryUpdate, onTaskUpdate, onTaskDelete }) => {
+const ChecklistCategory = ({ category, onTaskToggle, onDateChange, onAddItem, onCategoryUpdate, onTaskUpdate, onTaskDelete, onOpenTaskModal }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [draftName, setDraftName] = useState(category ? category.name : '');
     const { showToast } = useToast();
@@ -76,6 +76,7 @@ const ChecklistCategory = ({ category, onTaskToggle, onDateChange, onAddItem, on
                         categoryName={category.name}
                         onTaskUpdate={onTaskUpdate}
                         onTaskDelete={onTaskDelete}
+                        onOpenModal={() => onOpenTaskModal(item)}
                     />
                 ))}
             </div>

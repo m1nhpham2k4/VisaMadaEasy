@@ -112,7 +112,15 @@ const authService = {
       console.error('Guest session initiation error:', error.response?.data || error.message);
       throw error;
     }
-  }
+  },
+
+  getUserStatus: async () => {
+    // This is a client-side check. For server-side validation, use getCurrentUser.
+    if (authService.isAuthenticated()) {
+      return 'registered';
+    }
+    return 'guest';
+  },
 };
 
 export const AuthProvider = ({ children }) => {

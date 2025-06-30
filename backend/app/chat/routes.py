@@ -59,7 +59,7 @@ def _get_ai_response(user_message):
         raise ValueError("AI service configuration missing")
 
     genai.configure(api_key=api_key)
-    model_name = os.getenv('GEMINI_MODEL_NAME', 'gemini-2.0-flash-exp') 
+    model_name = os.getenv('GEMINI_MODEL_NAME', 'gemini-2.5-flash') 
     model = genai.GenerativeModel(model_name)
     response = model.generate_content(contents=[user_message])
     return response.text
@@ -232,3 +232,25 @@ def toggle_pin_session(session_id):
         "session_id": session.id,
         "is_pinned": session.is_pinned
     }) 
+
+@chat_bp.delete('/sessions/<int:session_id>') # New route for deleting a chat session
+@jwt_required()
+def delete_session(session_id):
+    if not isinstance(current_user, User):
+        return jsonify({"error": "Chat history features are only available for registered users"}), 403
+
+    session = ChatSession.query.filter_by(id=session_id, user_id=current_user.id).first()
+    if not session:
+        return jsonify({"error": "Chat session not found or access denied"}), 404
+
+    # Delete all messages associated with the session
+    ChatMessage.query.filter_by(session_id=session_id).delete()
+    # Delete the session itself
+    db.session.delete(session)
+    db.session.commit()
+    
+    return jsonify({
+        "success": True,
+        "message": "Chat session deleted successfully",
+        "session_id": session_id
+    })

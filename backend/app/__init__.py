@@ -38,7 +38,7 @@ def create_app(config_name=None):
     app.config.from_object(app_config[config_name])
     # app.config.from_pyfile('application.cfg', silent=True) # Example if using instance folder config
 
-    CORS(app) # Enable CORS globally for now, can be configured per blueprint/route
+    CORS(app, supports_credentials=True) # Enable CORS globally for now, can be configured per blueprint/route
 
     # Initialize extensions
     db.init_app(app)
@@ -98,5 +98,9 @@ def create_app(config_name=None):
     @app.route('/health')
     def health_check():
         return jsonify({"status": "healthy"}), 200
+
+    # Example of overriding a rate limit for a blueprint
+    limiter.limit("60 per minute")(chat_bp)
+    limiter.limit("60 per minute")(checklist_bp)
 
     return app 
