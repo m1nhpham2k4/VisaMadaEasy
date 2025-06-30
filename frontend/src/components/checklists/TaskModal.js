@@ -26,6 +26,8 @@ const TaskModal = ({ isOpen, onClose, task, onSaveChanges, onTaskUpdate, onTaskD
       return objA === objB;
     }
 
+    if (objA.task_title !== objB.task_title) return false;
+
     const dateA = objA.due_date ? new Date(objA.due_date).getTime() : null;
     const dateB = objB.due_date ? new Date(objB.due_date).getTime() : null;
     if (dateA !== dateB) return false;
@@ -154,42 +156,52 @@ const TaskModal = ({ isOpen, onClose, task, onSaveChanges, onTaskUpdate, onTaskD
     }));
   };
   
-  const handleSaveChanges = () => {
-    if (onSaveChanges) {
-        const payload = {};
-        
-        // Only include fields that have actually changed
-        if (editedTask.description !== task.description) {
-            payload.description = editedTask.description;
-        }
-        
-        if (editedTask.due_date && (!task.due_date || 
-            new Date(editedTask.due_date).getTime() !== new Date(task.due_date).getTime())) {
-            payload.due_date = editedTask.due_date.toISOString();
-        }
-        
-        if (editedTask.is_completed !== task.is_completed) {
-            payload.is_completed = editedTask.is_completed;
-        }
+  const handleSaveChanges = async () => {
+    const payload = {};
+    
+    if (task.task_title !== editedTask.task_title) {
+        payload.task_title = editedTask.task_title;
+    }
+    if (task.description !== editedTask.description) {
+        payload.description = editedTask.description;
+    }
+    
+    const originalDate = task.due_date ? new Date(task.due_date).getTime() : null;
+    const editedDate = editedTask.due_date ? new Date(editedTask.due_date).getTime() : null;
 
-        // Only include document changes if there are any
-        const newDocs = editedTask.documents.filter(d => d.file);
-        const removedDocs = task.documents
-            .filter(originalDoc => !editedTask.documents.some(editedDoc => editedDoc.id === originalDoc.id))
-            .map(doc => doc.id);
+    if (originalDate !== editedDate) {
+        payload.due_date = editedTask.due_date ? editedTask.due_date.toISOString() : null;
+    }
+    
+    if (task.is_completed !== editedTask.is_completed) {
+        payload.is_completed = editedTask.is_completed;
+    }
 
-        if (newDocs.length > 0) {
-            payload.new_documents = newDocs;
-        }
-        if (removedDocs.length > 0) {
-            payload.removed_documents = removedDocs;
-        }
+    const newDocs = editedTask.documents.filter(d => d.file);
+    const removedDocs = task.documents
+        .filter(originalDoc => !editedTask.documents.some(editedDoc => editedDoc.id === originalDoc.id))
+        .map(doc => doc.id);
 
-        // Only call save if there are actual changes
-        if (Object.keys(payload).length > 0) {
-            onSaveChanges(task.id, payload);
+    if (newDocs.length > 0) {
+        payload.new_documents = newDocs;
+    }
+    if (removedDocs.length > 0) {
+        payload.removed_documents = removedDocs;
+    }
+
+    if (Object.keys(payload).length > 0) {
+        try {
+            const updatedTask = await checklistService.updateChecklistItem(task.id, payload);
+            if (onTaskUpdate) {
+                onTaskUpdate(updatedTask.data);
+            }
+            showToast('Save changes successfully', 'success');
+        } catch (error) {
+            console.error('Failed to save changes:', error);
+            showToast('Failed to save changes.', 'error');
         }
     }
+    
     onClose();
   };
   
@@ -252,24 +264,9 @@ const TaskModal = ({ isOpen, onClose, task, onSaveChanges, onTaskUpdate, onTaskD
     setDraftTitle(editedTask ? editedTask.task_title : '');
   };
 
-  const handleSaveTitle = async () => {
-    if (draftTitle === editedTask.task_title) {
-        setIsEditingTitle(false);
-        return;
-    }
-
-    try {
-        const updatedTaskData = await checklistService.updateChecklistItem(task.id, { task_title: draftTitle });
-        if (onTaskUpdate) {
-            onTaskUpdate(updatedTaskData.data);
-        }
-        setEditedTask(prev => ({ ...prev, task_title: draftTitle }));
-        setIsEditingTitle(false);
-        showToast('Task title updated!', 'success');
-    } catch (error) {
-        console.error('Failed to update task title:', error);
-        showToast('Failed to update title.', 'error');
-    }
+  const handleSaveTitle = () => {
+    setEditedTask(prev => ({ ...prev, task_title: draftTitle }));
+    setIsEditingTitle(false);
   };
 
   return (
@@ -284,131 +281,133 @@ const TaskModal = ({ isOpen, onClose, task, onSaveChanges, onTaskUpdate, onTaskD
       </ConfirmationModal>
 
       <div ref={modalRef} className={`task-modal ${isOpen ? 'open' : ''}`}>
-        <div className="task-modal-header">
-          <div className="header-left-actions">
-            <button 
-              className={`status-button ${editedTask.is_completed ? 'completed' : 'pending'}`}
-              onClick={handleStatusClick}
-            >
-              {editedTask.is_completed && <Check size={16} />}
-              {editedTask.is_completed ? 'Hoàn thành' : 'Đánh dấu hoàn thành'}
-            </button>
-          </div>
-          <div className="header-right-actions">
-            {isDirty && (
-              <button className="action-button primary-save-button" onClick={handleSaveChanges}>
-                <Save size={18} />
-                Lưu thay đổi
-              </button>
-            )}
-            <button className="action-button upload-button-modal" onClick={handleUploadClick}>
-              <Upload size={18} />
-              Tải lên
-            </button>
-            {/* Hidden file input */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              onChange={handleFileChange}
-              multiple // Allow multiple file selection
-            />
-            <div className="more-options-container">
-              <button className="icon-button more-options-button" onClick={handleMoreOptionsClick}>
-                <MoreVertical size={20} />
-              </button>
-              <TaskOptions
-                  show={showTaskOptions}
-                  onRename={handleRename}
-                  onDelete={handleDelete}
-              />
-            </div>
-            <button className="icon-button close-modal-button" onClick={onClose}>
-              <img src={CloseSideBar} alt="Close" />
-            </button>
-          </div>
-        </div>
-        
-        <div className="task-modal-body">
-          <div className="task-modal-main-content">
-            <div className="task-title-section">
-              {isEditingTitle ? (
-                <div className="title-edit-container">
-                    <input
-                        type="text"
-                        value={draftTitle}
-                        onChange={handleTitleChange}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSaveTitle()}
-                        className="title-input"
-                        autoFocus
-                    />
-                    <button onClick={handleSaveTitle} className="title-save-btn"><Save size={18} /></button>
-                    <button onClick={handleCancelTitleEdit} className="title-cancel-btn"><X size={18} /></button>
+        {editedTask && (
+          <>
+            <div className="task-modal-header">
+              <div className="header-left-actions">
+                <button 
+                  className={`status-button ${editedTask.is_completed ? 'completed' : 'pending'}`}
+                  onClick={handleStatusClick}
+                >
+                  {editedTask.is_completed && <Check size={16} />}
+                  {editedTask.is_completed ? 'Hoàn thành' : 'Đánh dấu hoàn thành'}
+                </button>
+              </div>
+              <div className="header-right-actions">
+                {isDirty && (
+                  <button className="action-button primary-save-button" onClick={handleSaveChanges}>
+                    <Save size={18} />
+                    Lưu thay đổi
+                  </button>
+                )}
+                <button className="action-button upload-button-modal" onClick={handleUploadClick}>
+                  <Upload size={18} />
+                  Tải lên
+                </button>
+                {/* Hidden file input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                  multiple // Allow multiple file selection
+                />
+                <div className="more-options-container">
+                  <button className="icon-button more-options-button" onClick={handleMoreOptionsClick}>
+                    <MoreVertical size={20} />
+                  </button>
+                  <TaskOptions
+                      show={showTaskOptions}
+                      onRename={handleRename}
+                      onDelete={handleDelete}
+                  />
                 </div>
-              ) : (
-                <h1 onClick={handleTitleClick} className="task-title-modal">
-                    {editedTask.task_title}
-                    <Edit size={16} className="edit-icon-title" />
-                </h1>
-              )}
+                <button className="icon-button close-modal-button" onClick={onClose}>
+                  <img src={CloseSideBar} alt="Close" />
+                </button>
+              </div>
             </div>
             
-            <div className="task-properties-section">
-              <div className="property-row">
-                <div className="property-label">Hạn nộp:</div>
-                <div className="property-value clickable" onClick={handleDateClick}>
-                  {formatDate(editedTask.due_date)}
+            <div className="task-modal-body">
+              <div className="task-modal-main-content">
+                <div className="task-title-section">
+                  {isEditingTitle ? (
+                    <div className="title-edit-container">
+                        <input
+                            type="text"
+                            value={draftTitle}
+                            onChange={handleTitleChange}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveTitle()}
+                            className="title-input"
+                            autoFocus
+                        />
+                        <button onClick={handleSaveTitle} className="title-save-btn"><Save size={18} /></button>
+                        <button onClick={handleCancelTitleEdit} className="title-cancel-btn"><X size={18} /></button>
+                    </div>
+                  ) : (
+                    <h1 onClick={handleTitleClick} className="task-title-modal">
+                        {editedTask.task_title}
+                        <Edit size={16} className="edit-icon-title" />
+                    </h1>
+                  )}
                 </div>
-                {isDatePickerOpen && (
-                  <div className="task-modal-date-picker-container">
-                    <DatePicker 
-                      onClose={handleDatePickerClose}
-                      onDateSelected={handleDateSelected}
-                      selectedDate={editedTask.due_date}
-                    />
+                
+                <div className="task-properties-section">
+                  <div className="property-row">
+                    <div className="property-label">Hạn nộp:</div>
+                    <div className="property-value clickable" onClick={handleDateClick}>
+                      {formatDate(editedTask.due_date)}
+                    </div>
+                    {isDatePickerOpen && (
+                      <DatePicker 
+                        onClose={handleDatePickerClose}
+                        onDateSelected={handleDateSelected}
+                        selectedDate={editedTask.due_date}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="description-section">
+                  <label htmlFor="task-description-textarea" className="description-label">Miêu tả</label>
+                  <textarea
+                    id="task-description-textarea"
+                    className="description-textarea"
+                    value={editedTask.description}
+                    onChange={(e) => setEditedTask({...editedTask, description: e.target.value})}
+                    placeholder="Không có mô tả chi tiết."
+                    rows={10}
+                  />
+                </div>
+                
+                {/* Uploaded files section */}
+                {editedTask.documents.length > 0 && (
+                  <div className="uploaded-files-section">
+                    <h3 className="uploaded-files-heading">Tập tin đã tải lên</h3>
+                    <div className="uploaded-files-list">
+                      {editedTask.documents.map(doc => (
+                        <div key={doc.id} className="uploaded-file-item">
+                          <div className="file-info">
+                            <span className="file-name">{doc.file_name || doc.name}</span>
+                            {doc.size && <span className="file-size">{formatFileSize(doc.size)}</span>}
+                          </div>
+                          <button 
+                            className="remove-file-button"
+                            onClick={() => handleRemoveFile(doc.id)}
+                            aria-label="Remove file"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
+                {/* Future sections like comments or subtasks can be added here */}
               </div>
             </div>
-
-            <div className="description-section">
-              <label htmlFor="task-description-textarea" className="description-label">Miêu tả</label>
-              <textarea
-                id="task-description-textarea"
-                className="description-textarea"
-                value={editedTask.description}
-                onChange={(e) => setEditedTask({...editedTask, description: e.target.value})}
-                placeholder="Không có mô tả chi tiết."
-                rows={10}
-              />
-            </div>
-            
-            {/* Uploaded files section */}
-            {editedTask.documents.length > 0 && (
-              <div className="uploaded-files-section">
-                <h3 className="uploaded-files-heading">Tập tin đã tải lên</h3>
-                <div className="uploaded-files-list">
-                  {editedTask.documents.map(doc => (
-                    <div key={doc.id} className="uploaded-file-item">
-                      <div className="file-info">
-                        <span className="file-name">{doc.file_name || doc.name}</span>
-                        {doc.size && <span className="file-size">{formatFileSize(doc.size)}</span>}
-                      </div>
-                      <button 
-                        className="remove-file-button"
-                        onClick={() => handleRemoveFile(doc.id)}
-                        aria-label="Remove file"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Future sections like comments or subtasks can be added here */}
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

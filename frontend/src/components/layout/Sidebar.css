@@ -552,3 +552,24 @@
   background-color: rgba(255, 149, 0, 0.1); /* Light orange background */
   z-index: -1;
 }
+
+/* Search Input Styling */
+.sidebar-search-container {
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.sidebar-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+/* Search Results Styling */
+.sidebar-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

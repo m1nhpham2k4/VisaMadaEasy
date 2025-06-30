@@ -1,8 +1,6 @@
 import React, { useState, useRef } from 'react';
 import './ChecklistItem.css'; // We will create this CSS file next
 // import rightArrowIcon from '../../assets/icons/checkbox_vector.svg'; // Import checkbox SVG
-import TaskModal from './TaskModal'; // Import the TaskModal component
-import checklistService from '../../services/checklistService'; // Import the service
 import { useToast } from '../../context/ToastContext'; // Import useToast
 
 // Helper function to format date as DD/MM (e.g., 14/4)
@@ -25,9 +23,8 @@ const formatDate = (dateString) => {
     }
 };
 
-const ChecklistItem = ({ item, onToggle, categoryName, onTaskUpdate, onTaskDelete }) => {
+const ChecklistItem = ({ item, onToggle, onOpenModal, onTaskUpdate, onTaskDelete }) => {
     const [isHovered, setIsHovered] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false);
     const fileInputRef = useRef(null);
     const { showToast } = useToast(); // Get the showToast function
     
@@ -40,14 +37,6 @@ const ChecklistItem = ({ item, onToggle, categoryName, onTaskUpdate, onTaskDelet
         onToggle(item.id, !item.is_completed);
     };
 
-    const handleItemClick = () => {
-        setIsModalOpen(true);
-    };
-
-    const handleCloseModal = () => {
-        setIsModalOpen(false);
-    };
-
     // Handle file upload button click
     const handleUploadClick = (e) => {
         e.stopPropagation(); // Prevent modal from opening
@@ -58,51 +47,13 @@ const ChecklistItem = ({ item, onToggle, categoryName, onTaskUpdate, onTaskDelet
     const handleFileChange = (e) => {
         const files = e.target.files;
         if (files.length > 0) {
-            console.log(`Selected file: ${files[0].name}`);
-            // Here you would typically:
-            // 1. Upload the file to your server
-            // 2. Associate it with the current task/item
-            // 3. Update the UI/state as needed
-            
-            // For now, just display a message
-            alert(`File selected: ${files[0].name}`);
+            // For now, we are not implementing the upload from this button.
+            // This can be a future enhancement.
+            // The main upload functionality is within the TaskModal.
+            showToast('File selection from here is not yet implemented.', 'info');
             
             // Clear the input to allow selecting the same file again
             e.target.value = '';
-        }
-    };
-
-    const handleSaveChanges = async (itemId, data) => {
-        try {
-            // Send only the fields that the backend expects
-            const updatePayload = {};
-            
-            // Map the fields correctly
-            if ('title' in data) {
-                updatePayload.title = data.title;
-            }
-            if ('description' in data) {
-                updatePayload.description = data.description;
-            }
-            if ('due_date' in data) {
-                updatePayload.due_date = data.due_date;
-            }
-            if ('is_completed' in data) {
-                updatePayload.is_completed = data.is_completed;
-            }
-
-            const response = await checklistService.updateChecklistItem(itemId, updatePayload);
-            
-            if (response.data) {
-                showToast('Changes saved successfully!', 'success');
-                // Update the local state with the response data
-                if (onTaskUpdate) {
-                    onTaskUpdate(response.data);
-                }
-            }
-        } catch (error) {
-            console.error('Failed to save changes:', error);
-            showToast(error.response?.data?.error || 'Failed to save changes.', 'error');
         }
     };
 
@@ -126,73 +77,57 @@ const ChecklistItem = ({ item, onToggle, categoryName, onTaskUpdate, onTaskDelet
     );
 
     return (
-        <>
-            <div 
-                className={itemClassName}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-                onClick={handleItemClick}
-            >
-                <div className="item-content">
-                    <label className="item-label" onClick={(e) => e.stopPropagation()}>
-                        <input
-                            type="checkbox"
-                            checked={item.is_completed}
-                            onChange={handleChange}
-                            className="hidden-checkbox" // Hide the actual checkbox
-                        />
-                        <span className="custom-checkbox">{checkboxIcon}</span>
-                        <span className={descriptionClassName}>{item.task_title}</span>
-                    </label>
+        <div 
+            className={itemClassName}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            onClick={onOpenModal}
+        >
+            <div className="item-content">
+                <label className="item-label" onClick={(e) => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        checked={item.is_completed}
+                        onChange={handleChange}
+                        className="hidden-checkbox" // Hide the actual checkbox
+                    />
+                    <span className="custom-checkbox">{checkboxIcon}</span>
+                    <span className={descriptionClassName}>{item.task_title}</span>
+                </label>
+                
+                <div className="item-actions">
+                    {item.due_date && (
+                        <span className={`item-due-date ${item.is_completed ? 'completed-text' : ''}`}>
+                            {formatDate(item.due_date)}
+                        </span>
+                    )}
                     
-                    <div className="item-actions">
-                        {item.due_date && (
-                            <span className={`item-due-date ${item.is_completed ? 'completed-text' : ''}`}>
-                                {formatDate(item.due_date)}
+                    {isHovered && (
+                        <div className="hover-actions">
+                            <button 
+                                className="upload-button-visible"
+                                onClick={handleUploadClick}
+                            >
+                                Tải lên
+                            </button>
+                            {/* Hidden file input */}
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                onChange={handleFileChange}
+                                multiple // Allow multiple file selection if needed
+                            />
+                            <span className="arrow-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 17L15 12L10 7" stroke="#0F172B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
                             </span>
-                        )}
-                        
-                        {isHovered && (
-                            <div className="hover-actions">
-                                <button 
-                                    className="upload-button-visible"
-                                    onClick={handleUploadClick}
-                                >
-                                    Tải lên
-                                </button>
-                                {/* Hidden file input */}
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    style={{ display: 'none' }}
-                                    onChange={handleFileChange}
-                                    multiple // Allow multiple file selection if needed
-                                />
-                                <span className="arrow-icon">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M10 17L15 12L10 7" stroke="#0F172B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                    </svg>
-                                </span>
-                            </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
-
-            {/* Task Modal */}
-            <TaskModal 
-                isOpen={isModalOpen} 
-                onClose={handleCloseModal} 
-                task={{
-                    ...item,
-                    category_name: categoryName || 'Không xác định',
-                    documents: item.documents || []
-                }}
-                onSaveChanges={handleSaveChanges}
-                onTaskUpdate={onTaskUpdate}
-                onTaskDelete={onTaskDelete}
-            />
-        </>
+        </div>
     );
 };
 

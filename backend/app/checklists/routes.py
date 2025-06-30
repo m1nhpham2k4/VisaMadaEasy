@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services.checklist_service import ChecklistService
 from app.checklists.schemas import (
     ChecklistProfileSchema,
+    ChecklistProfileCreateSchema,
     ChecklistCategorySchema,
     ChecklistItemSchema,
     DocumentSchema,
@@ -12,6 +13,7 @@ from app.checklists.schemas import (
 )
 from marshmallow import ValidationError
 from app.users.models import User
+from flask import current_app
 
 checklist_bp = Blueprint('checklist', __name__)
 
@@ -25,6 +27,27 @@ checklist_item_update_schema = ChecklistItemUpdateSchema(partial=True)
 document_schema = DocumentSchema()
 
 # --- Checklist Profile Routes ---
+@checklist_bp.route('/checklist/profile/generate-from-llm', methods=['POST'])
+@jwt_required()
+def generate_checklist_from_llm_route():
+    user_username = get_jwt_identity()
+    user = User.query.filter_by(username=user_username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    user_id = user.id
+
+    json_data = request.get_json()
+    if not json_data or 'prompt' not in json_data:
+        return jsonify({"error": "No prompt provided"}), 400
+    
+    prompt = json_data['prompt']
+
+    try:
+        response, status_code = ChecklistService.create_checklist_profile_from_llm(user_id, prompt)
+        return jsonify(response), status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @checklist_bp.route('/checklist/profile', methods=['GET', 'POST'])
 @jwt_required()
 def handle_checklist_profiles():
@@ -85,10 +108,13 @@ def update_checklist_profile_route(profile_id): # Renamed function, removed chec
 @jwt_required()
 def delete_checklist_profile_route(profile_id):
     try:
-        user_username = get_jwt_identity() # Ensure the user has rights, though service might not use it directly for delete
-        user_id = User.get_user_by_username(user_username).id
+        user_username = get_jwt_identity()
+        user = User.query.filter_by(username=user_username).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        user_id = user.id
 
-        response, status_code = ChecklistService.delete_checklist_profile(profile_id, user_id) # Pass user_id if service needs it
+        response, status_code = ChecklistService.delete_checklist_profile(profile_id, user_id)
         return jsonify(response), status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -255,7 +281,28 @@ def remove_document_from_item_route(item_id, document_id):
         if not user:
             return jsonify({"error": "User not found"}), 404
         user_id = user.id
+        
         response, status_code = ChecklistService.remove_document_from_item(item_id, document_id, user_id)
         return jsonify(response), status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# --- User's Aggregated Tasks Route ---
+@checklist_bp.route('/my-tasks', methods=['GET'])
+@jwt_required()
+def get_my_tasks():
+    """
+    Fetches all checklist items for the authenticated user,
+    categorized into pending, overdue, and done.
+    """
+    user_username = get_jwt_identity()
+    user = User.query.filter_by(username=user_username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        response_data, status_code = ChecklistService.get_categorized_tasks_for_user(user.id)
+        return jsonify(response_data), status_code
+    except Exception as e:
+        current_app.logger.error(f"Error in get_my_tasks route for user {user.id}: {str(e)}")
+        return jsonify({"error": "An error occurred while fetching your tasks."}), 500

@@ -17,6 +17,17 @@ const checklistService = {
         return apiClient.get(`/checklists/checklist/profile/${profileId}`);
     },
 
+    getChecklistItem: (itemId) => {
+        if (!itemId) {
+            return Promise.reject(new Error('Item ID is required to fetch a checklist item.'));
+        }
+        if (USE_MOCK_DATA) {
+            // This would need to find the item in mock data, returning a placeholder for now
+            return Promise.resolve({ data: mockChecklistData.categories[0].items[0] });
+        }
+        return apiClient.get(`/checklists/checklist/item/${itemId}`);
+    },
+
     updateChecklistItem: (itemId, data) => {
         if (!itemId) {
             return Promise.reject(new Error('Item ID is required to update checklist item.'));
@@ -106,7 +117,14 @@ const checklistService = {
             return Promise.reject(new Error('Category ID is required to delete category.'));
         }
         return apiClient.delete(`/checklists/checklist/category/${categoryId}`);
-    }
+    },
+
+    generateChecklistFromPrompt: (prompt) => {
+        if (!prompt) {
+            return Promise.reject(new Error('A prompt is required to generate a checklist.'));
+        }
+        return apiClient.post('/checklists/checklist/profile/generate-from-llm', { prompt });
+    },
 };
 
-export default checklistService; 
+export default checklistService;

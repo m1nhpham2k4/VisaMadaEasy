@@ -8,31 +8,27 @@ import pinIconSVG from '../../assets/icons/pin.svg';
 import arrowDropDownIconSVG from '../../assets/landing_page_icons/arrow_drop_down.svg';
 import apiClient from '../../services/apiClient'; // Import apiClient
 import checklistService from '../../services/checklistService'; // Import checklistService
+import ConfirmationModal from '../common/ConfirmationModal'; // Import ConfirmationModal
 
 // Import new icons
 import moreHorizontalIconSVG from '../../assets/icons/more_horizontal.svg';
 import pencilIconSVG from '../../assets/icons/pencil.svg';
 import trashIconSVG from '../../assets/icons/trash.svg';
 import uploadIconSVG from '../../assets/icons/upload.svg';
+import shareIconSVG from '../../assets/icons/share.svg';
 
-// Old ArrowDropDownIcon component (text-based)
-// const ArrowDropDownIcon = ({ isOpen }) => (
-//   <span style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'inline-block', transition: 'transform 0.2s' }}>
-//     ▼
-//   </span>
-// );
-
-// Helper function to get JWT token (replace with your actual auth service if available)
-// No longer strictly needed here as apiClient handles token attachment
-// const getAuthToken = () => {
-//   return localStorage.getItem('jwtToken'); 
-// };
 
 const Sidebar = () => {
   const [hoSoOpen, setHoSoOpen] = useState(true); // Default open
   const [doanChatOpen, setDoanChatOpen] = useState(true); // Default open
   const [isEditDropdownOpen, setIsEditDropdownOpen] = useState(false); // State for the new dropdown
   const [activeChatOptions, setActiveChatOptions] = useState(null); // Stores the ID of the chat item whose options are open
+  const [searchQuery, setSearchQuery] = useState(''); // State for the search query
+  const [isSearching, setIsSearching] = useState(false); // State to control search input visibility
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false); // State for delete confirmation modal
+  const [chatIdToDelete, setChatIdToDelete] = useState(null); // Stores the ID of the chat to be deleted
+  const [checklistIdToDelete, setChecklistIdToDelete] = useState(null); // Stores the ID of the checklist to be deleted
+  const [activeChecklistOptions, setActiveChecklistOptions] = useState(null); // Stores the ID of the checklist item whose options are open
   const location = useLocation(); // Get the current location to determine active chat
   const [newChatId, setNewChatId] = useState(null);
   const navigate = useNavigate(); // Hook for navigation
@@ -159,6 +155,23 @@ const Sidebar = () => {
     }
   }, [currentSessionId, newChatId]); // Include dependencies that affect the function
 
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const toggleSearch = () => {
+    setIsSearching(!isSearching);
+    setSearchQuery(''); // Clear search query when toggling
+  };
+
+  const filteredHoSoItems = hoSoItems.filter(item =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredChatHistoryItems = Object.values(chatHistoryGroups)
+    .flat()
+    .filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
   // Refactor the useEffect to use our extracted fetch function
   useEffect(() => {
     if (doanChatOpen) { // Fetch only if the section is open or intended to be open
@@ -196,14 +209,13 @@ const Sidebar = () => {
   // Function to handle creating a new chat session
   const handleNewChat = async () => {
     try {
-      // Navigate to the home page
-      navigate('/home');
+      // Navigate to the chat page without creating a session explicitly
+      navigate('/chat');
       setIsEditDropdownOpen(false); // Close dropdown
     } catch (error) {
-      console.error("Failed to navigate or close dropdown:", error);
+      console.error("Failed to navigate:", error);
       // Handle error appropriately, e.g., show a notification to the user
-      // You might still want to close the dropdown in case of an error during navigation
-      setIsEditDropdownOpen(false);
+      setIsEditDropdownOpen(false); // Close dropdown on error
     }
   };
 
@@ -236,9 +248,49 @@ const Sidebar = () => {
   };
 
   const handleDeleteChat = (chatId) => {
-    console.log("Delete chat:", chatId);
+    setChatIdToDelete(chatId);
+    setIsDeleteModalOpen(true);
     setActiveChatOptions(null); // Close dropdown after action
-    // Future implementation: Show a confirmation modal and then call API
+  };
+
+  const handleConfirmDelete = async () => {
+    if (chatIdToDelete) {
+      try {
+        await apiClient.delete(`/chat/sessions/${chatIdToDelete}`);
+        fetchAndGroupSessions(); // Refresh the chat list
+        // If the deleted chat is the current active chat, navigate to home
+        if (currentSessionId === chatIdToDelete.toString()) {
+          navigate('/home');
+        }
+      } catch (error) {
+        console.error("Failed to delete chat:", error);
+        alert("Không thể xóa đoạn chat. Vui lòng thử lại sau.");
+      } finally {
+        setIsDeleteModalOpen(false);
+        setChatIdToDelete(null);
+      }
+    } else if (checklistIdToDelete) {
+      try {
+        await apiClient.delete(`/checklists/checklist/profile/${checklistIdToDelete}`);
+        fetchChecklists(); // Refresh the checklist list
+        // If the deleted checklist is the current active checklist, navigate to home
+        if (currentChecklistId === checklistIdToDelete.toString()) {
+          navigate('/home');
+        }
+      } catch (error) {
+        console.error("Failed to delete checklist:", error.response ? error.response.data : error.message);
+        alert("Không thể xóa hồ sơ. Vui lòng kiểm tra console để biết thêm chi tiết hoặc thử lại sau.");
+      } finally {
+        setIsDeleteModalOpen(false);
+        setChecklistIdToDelete(null);
+      }
+    }
+  };
+
+  const handleCloseDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setChatIdToDelete(null);
+    setChecklistIdToDelete(null);
   };
 
   // Add pin/unpin functionality
@@ -327,30 +379,43 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="sidebar">
-      {/* Frame 98 - Top Icons */}
-      <div className="sidebar-frame98">
-        <div className="edit-icon-container" style={{ position: 'relative' }}>
-          <img 
-            src={editIconSVG} 
-            alt="Edit" 
-            className="icon-edit-img" 
-            onClick={() => setIsEditDropdownOpen(!isEditDropdownOpen)} 
-            style={{ cursor: 'pointer' }}
-          />
-          {isEditDropdownOpen && (
-            <div className="edit-dropdown-menu">
-              <button onClick={handleNewChat} className="edit-dropdown-item">
-                Đoạn chat mới
-              </button>
-              <button onClick={handleNewProfile} className="edit-dropdown-item">
-                Hồ sơ mới
-              </button>
-            </div>
-          )}
+    <div className="sidebar-container">
+      <div className="sidebar">
+        {/* Frame 98 - Top Icons */}
+        <div className="sidebar-frame98">
+          <div className="edit-icon-container" style={{ position: 'relative' }}>
+            <img 
+              src={editIconSVG} 
+              alt="Edit" 
+              className="icon-edit-img" 
+              onClick={() => setIsEditDropdownOpen(!isEditDropdownOpen)} 
+              style={{ cursor: 'pointer' }}
+            />
+            {isEditDropdownOpen && (
+              <div className="edit-dropdown-menu">
+                <button onClick={handleNewChat} className="edit-dropdown-item">
+                  Đoạn chat mới
+                </button>
+                <button onClick={handleNewProfile} className="edit-dropdown-item">
+                  Hồ sơ mới
+                </button>
+              </div>
+            )}
+          </div>
+          <img src={searchIconSVG} alt="Search" className="icon-search-img" onClick={toggleSearch} style={{ cursor: 'pointer' }} />
         </div>
-        <img src={searchIconSVG} alt="Search" className="icon-search-img" />
-      </div>
+
+      {isSearching && (
+        <div className="sidebar-search-container">
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="sidebar-search-input"
+          />
+        </div>
+      )}
 
       {/* Menu tag - Home Link */}
       <Link to="/home" className="sidebar-menu-tag">
@@ -360,74 +425,150 @@ const Sidebar = () => {
         <span className="sidebar-menu-tag-text">Trang chủ</span>
       </Link>
 
-      {/* Hồ sơ Section */}
-      <div className="sidebar-section-container ho-so-section">
-        <div className="sidebar-dropdown-header" onClick={() => setHoSoOpen(!hoSoOpen)}>
-          <span className="sidebar-dropdown-title">Hồ sơ</span>
-          <div className="sidebar-dropdown-icon">
-            <img 
-              src={arrowDropDownIconSVG} 
-              alt="Toggle section" 
-              style={{ 
-                transform: hoSoOpen ? 'rotate(0deg)' : 'rotate(90deg)', 
-                transition: 'transform 0.2s',
-                width: '10px', /* Reduced size */
-                height: '10px' /* Reduced size */
-              }} 
-            />
+      {searchQuery ? (
+        <div className="sidebar-search-results">
+          <div className="sidebar-section-container ho-so-section">
+            <div className="sidebar-dropdown-header">
+              <span className="sidebar-dropdown-title">Hồ sơ</span>
+            </div>
+            <div className="sidebar-subitems-list">
+              {filteredHoSoItems.map(item => (
+                <Link to={item.link} key={item.id} className="sidebar-subitem-tag">
+                  <span className="sidebar-subitem-text">{item.name}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div className="sidebar-section-container doan-chat-section">
+            <div className="sidebar-dropdown-header">
+              <span className="sidebar-dropdown-title">Đoạn chat</span>
+            </div>
+            <div className="sidebar-chat-history-container">
+              {renderChatGroup("Kết quả tìm kiếm", filteredChatHistoryItems, null, 'search')}
+            </div>
           </div>
         </div>
-        {hoSoOpen && (
-          <div className="sidebar-subitems-list">
-            {hoSoItems.map(item => (
-              <Link to={item.link} key={item.id} className="sidebar-subitem-tag">
-                {/* Icon placeholder if needed: <div className="sidebar-subitem-icon"></div> */}
-                <span className="sidebar-subitem-text">{item.name}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Đoạn chat Section */}
-      <div className="sidebar-section-container doan-chat-section">
-        <div className="sidebar-dropdown-header" onClick={() => setDoanChatOpen(!doanChatOpen)}>
-          <span className="sidebar-dropdown-title">Đoạn chat</span>
-          <div className="sidebar-dropdown-icon">
-            <img 
-              src={arrowDropDownIconSVG} 
-              alt="Toggle section" 
-              style={{ 
-                transform: doanChatOpen ? 'rotate(0deg)' : 'rotate(90deg)', 
-                transition: 'transform 0.2s',
-                width: '10px', /* Reduced size */
-                height: '10px' /* Reduced size */
-              }} 
-            />
-          </div>
-        </div>
-        {doanChatOpen && (
-          <div className="sidebar-chat-history-container">
-            {isLoadingHistory && <p className="sidebar-loading-text">Đang tải lịch sử chat...</p>}
-            {errorHistory && <p className="sidebar-error-text">Lỗi: {errorHistory}</p>}
-            
-            {!isLoadingHistory && !errorHistory && (
-              <>
-                {renderChatGroup("Đã ghim", chatHistoryGroups.pinned, pinIconSVG, 'pinned')}
-                {renderChatGroup("Hôm nay", chatHistoryGroups.today, null, 'today')}
-                {renderChatGroup("Hôm qua", chatHistoryGroups.yesterday, null, 'yesterday')}
-                {renderChatGroup("7 ngày trước đó", chatHistoryGroups.previous7Days, null, 'previous7Days')}
-                {renderChatGroup("30 ngày trước đó", chatHistoryGroups.previous30Days, null, 'previous30Days')}
-                {renderChatGroup("Cũ hơn", chatHistoryGroups.older, null, 'older')}
-                
-                {allChatItemsEmpty() && !chatHistoryGroups.pinned.length && ( // Show if all dynamic groups are empty
-                  <p className="sidebar-no-items-text" style={{padding: '10px 20px'}}>Không có lịch sử chat nào.</p>
-                )}
-              </>
+      ) : (
+        <>
+          {/* Hồ sơ Section */}
+          <div className="sidebar-section-container ho-so-section">
+            <div className="sidebar-dropdown-header" onClick={() => setHoSoOpen(!hoSoOpen)}>
+              <span className="sidebar-dropdown-title">Hồ sơ</span>
+              <div className="sidebar-dropdown-icon">
+                <img 
+                  src={arrowDropDownIconSVG} 
+                  alt="Toggle section" 
+                  style={{ 
+                    transform: hoSoOpen ? 'rotate(0deg)' : 'rotate(90deg)', 
+                    transition: 'transform 0.2s',
+                    width: '10px', /* Reduced size */
+                    height: '10px' /* Reduced size */
+                  }} 
+                />
+              </div>
+            </div>
+            {hoSoOpen && (
+              <div className="sidebar-subitems-list">
+                {hoSoItems.map(item => (
+                  <div key={item.id} className="sidebar-subitem-wrapper">
+                    <Link 
+                      to={item.link} 
+                      className={`sidebar-subitem-tag ${item.active ? 'active' : ''}`}
+                      title={item.name}
+                    >
+                      <span className="sidebar-subitem-text">{item.name}</span>
+                      <img
+                        src={moreHorizontalIconSVG}
+                        alt="More options"
+                        className="sidebar-more-options-icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setActiveChecklistOptions(activeChecklistOptions === item.id ? null : item.id);
+                        }}
+                      />
+                    </Link>
+                    {activeChecklistOptions === item.id && (
+                      <div className="chat-options-dropdown">
+                        <button className="chat-options-item">
+                          <img src={shareIconSVG} alt="Share" />
+                          Chia sẻ
+                        </button>
+                        <button className="chat-options-item">
+                          <img src={pencilIconSVG} alt="Rename" />
+                          Đổi tên
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setChecklistIdToDelete(item.id);
+                            setIsDeleteModalOpen(true);
+                            setActiveChecklistOptions(null);
+                          }} 
+                          className="chat-options-item chat-options-item-delete"
+                        >
+                          <img src={trashIconSVG} alt="Delete" />
+                          Xóa
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-        )}
+
+          {/* Đoạn chat Section */}
+          <div className="sidebar-section-container doan-chat-section">
+            <div className="sidebar-dropdown-header" onClick={() => setDoanChatOpen(!doanChatOpen)}>
+              <span className="sidebar-dropdown-title">Đoạn chat</span>
+              <div className="sidebar-dropdown-icon">
+                <img 
+                  src={arrowDropDownIconSVG} 
+                  alt="Toggle section" 
+                  style={{ 
+                    transform: doanChatOpen ? 'rotate(0deg)' : 'rotate(90deg)', 
+                    transition: 'transform 0.2s',
+                    width: '10px', /* Reduced size */
+                    height: '10px' /* Reduced size */
+                  }} 
+                />
+              </div>
+            </div>
+            {doanChatOpen && (
+              <div className="sidebar-chat-history-container">
+                {isLoadingHistory && <p className="sidebar-loading-text">Đang tải lịch sử chat...</p>}
+                {errorHistory && <p className="sidebar-error-text">Lỗi: {errorHistory}</p>}
+                
+                {!isLoadingHistory && !errorHistory && (
+                  <>
+                    {renderChatGroup("Đã ghim", chatHistoryGroups.pinned, pinIconSVG, 'pinned')}
+                    {renderChatGroup("Hôm nay", chatHistoryGroups.today, null, 'today')}
+                    {renderChatGroup("Hôm qua", chatHistoryGroups.yesterday, null, 'yesterday')}
+                    {renderChatGroup("7 ngày trước đó", chatHistoryGroups.previous7Days, null, 'previous7Days')}
+                    {renderChatGroup("30 ngày trước đó", chatHistoryGroups.previous30Days, null, 'previous30Days')}
+                    {renderChatGroup("Cũ hơn", chatHistoryGroups.older, null, 'older')}
+                    
+                    {allChatItemsEmpty() && !chatHistoryGroups.pinned.length && ( // Show if all dynamic groups are empty
+                      <p className="sidebar-no-items-text" style={{padding: '10px 20px'}}>Không có lịch sử chat nào.</p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
       </div>
+      {isDeleteModalOpen && (
+        <ConfirmationModal
+          isOpen={isDeleteModalOpen}
+          onClose={handleCloseDeleteModal}
+          onConfirm={handleConfirmDelete}
+          title={checklistIdToDelete ? "Xác nhận xóa hồ sơ" : "Xác nhận xóa đoạn chat"}
+        >
+          <p>Bạn có chắc chắn muốn xóa {checklistIdToDelete ? "hồ sơ" : "đoạn chat"} này? Hành động này không thể hoàn tác.</p>
+        </ConfirmationModal>
+      )}
     </div>
   );
 };

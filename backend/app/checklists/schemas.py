@@ -31,6 +31,15 @@ class ChecklistItemSchema(SQLAlchemyAutoSchema):
         fields = ("id", "category_id", "task_title", "is_completed", "due_date", "description", "order", "documents", "created_at", "updated_at")
         ordered = True
 
+class MyTasksItemSchema(Schema):
+    """Schema for items in the 'My Tasks' aggregated view."""
+    item_id = fields.Int(attribute="id")
+    item_title = fields.Str(attribute="task_title")
+    due_date = fields.DateTime()
+    parent_checklist_id = fields.Int(attribute="category.profile.id")
+    parent_checklist_title = fields.Str(attribute="category.profile.title")
+    is_completed = fields.Boolean() # Include completion status for context
+
 class ChecklistCategorySchema(SQLAlchemyAutoSchema):
     id = fields.Int(dump_only=True)
     profile_id = fields.Int(required=True, error_messages={"required": "Profile ID is required."})
@@ -59,6 +68,11 @@ class ChecklistProfileSchema(SQLAlchemyAutoSchema):
         # Note: Ensure your ChecklistProfile model is correctly imported and configured for SQLAlchemyAutoSchema if you use it.
         fields = ("id", "user_id", "title", "due_date", "status", "categories", "created_at", "updated_at")
         ordered = True
+
+class ChecklistProfileCreateSchema(Schema):
+    title = fields.String(required=True, validate=validate.Length(min=1), error_messages={"required": "Title cannot be empty."})
+    due_date = fields.DateTime(allow_none=True)
+    status = fields.String(validate=validate.OneOf(["on_hold", "in_progress", "completed"]), missing="on_hold")
 
 class ChecklistItemUpdateSchema(Schema):
     task_title = fields.String(validate=validate.Length(min=1))

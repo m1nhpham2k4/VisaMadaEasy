@@ -4,15 +4,21 @@ from sqlalchemy.exc import SQLAlchemyError
 from flask import current_app
 from app.checklists.schemas import (
     ChecklistProfileSchema,
+    ChecklistProfileCreateSchema,
     ChecklistCategorySchema,
     ChecklistItemSchema,
     DocumentSchema,
     ChecklistProfileUpdateSchema,
     ChecklistCategoryUpdateSchema,
-    ChecklistItemUpdateSchema
+    ChecklistItemUpdateSchema,
+    MyTasksItemSchema
 )
 from marshmallow import ValidationError
 from datetime import datetime
+import google.generativeai as genai
+import os
+import json
+from pytz import timezone
 
 
 class ChecklistService:
@@ -25,7 +31,7 @@ class ChecklistService:
     @staticmethod
     def create_checklist_profile(user_id, data):
         """Create a new checklist profile for a user"""
-        profile_schema = ChecklistProfileSchema()
+        profile_schema = ChecklistProfileCreateSchema()
         try:
             validated_data = profile_schema.load(data)
         except ValidationError as err:
@@ -40,7 +46,9 @@ class ChecklistService:
         try:
             db.session.add(profile)
             db.session.commit()
-            return profile_schema.dump(profile), 201
+            # Use the full schema for dumping the response
+            response_schema = ChecklistProfileSchema()
+            return response_schema.dump(profile), 201
         except SQLAlchemyError as e:
             db.session.rollback()
             current_app.logger.error(f"Database error creating profile: {str(e)}")
@@ -49,6 +57,68 @@ class ChecklistService:
             db.session.rollback()
             current_app.logger.error(f"Unexpected error creating profile: {str(e)}")
             return {"error": str(e)}, 400
+
+    @staticmethod
+    def create_checklist_profile_from_llm(user_id, prompt):
+        """Create a new checklist profile for a user from a Gemini prompt"""
+        try:
+            api_key = os.getenv('GEMINI_API_KEY')
+            if not api_key:
+                current_app.logger.error("Error: Gemini API key missing from .env")
+                raise ValueError("AI service configuration missing")
+
+            genai.configure(api_key=api_key)
+            model_name = os.getenv('GEMINI_MODEL_NAME', 'gemini-2.0-flash-exp')
+            model = genai.GenerativeModel(model_name)
+            
+            full_prompt = f"""
+            Generate a JSON object for a checklist based on the following request: '{prompt}'.
+            The JSON object must have the following structure:
+            - A root object.
+            - The root object must have a key "title" with a string value.
+            - The root object must have a key "categories" which is an array of objects.
+            - Each object in the "categories" array must have a key "name" with a string value.
+            - Each object in the "categories" array must have a key "items" which is an array of objects.
+            - Each object in the "items" array must have a key "task_title" with a string value, and a key "description" with a string value.
+
+            Example of the required JSON format:
+            {{
+              "title": "Trip to Japan",
+              "categories": [
+                {{
+                  "name": "Pre-trip",
+                  "items": [
+                    {{
+                      "task_title": "Book flights",
+                      "description": "Find and book round-trip tickets."
+                    }},
+                    {{
+                      "task_title": "Book hotels",
+                      "description": "Reserve accommodation for all nights."
+                    }}
+                  ]
+                }}
+              ]
+            }}
+
+            Return only the JSON object, without any surrounding text or markdown.
+            """
+
+            response = model.generate_content(full_prompt)
+            
+            cleaned_response = response.text.strip()
+            if cleaned_response.startswith("```json"):
+                cleaned_response = cleaned_response[7:]
+            if cleaned_response.endswith("```"):
+                cleaned_response = cleaned_response[:-3]
+
+            llm_data = json.loads(cleaned_response)
+            
+            return ChecklistService.create_checklist_profile(user_id, llm_data)
+            
+        except Exception as e:
+            current_app.logger.error(f"Error generating checklist from LLM: {str(e)}")
+            return {"error": "Lỗi tạo hồ sơ checklist từ LLM"}, 500
 
     @staticmethod
     def get_checklist_profile(profile_id):
@@ -63,6 +133,56 @@ class ChecklistService:
         except Exception as e:
             current_app.logger.error(f"Error fetching profile {profile_id}: {str(e)}")
             return {"error": "Lỗi lấy thông tin hồ sơ checklist"}, 500
+
+    @staticmethod
+    def get_categorized_tasks_for_user(user_id):
+        """
+        Fetches all checklist items for a user, categorizes them,
+        and returns them in a structured response.
+        """
+        try:
+            # Eagerly load relationships to avoid N+1 query problem.
+            all_items = db.session.query(ChecklistItem).join(
+                ChecklistCategory
+            ).join(ChecklistProfile).filter(
+                ChecklistProfile.user_id == user_id
+            ).options(
+                db.joinedload(ChecklistItem.category).joinedload(ChecklistCategory.profile)
+            ).all()
+
+            now_utc = datetime.now(timezone('UTC'))
+            
+            categorized = {
+                "pending": [],
+                "overdue": [],
+                "done": []
+            }
+
+            for item in all_items:
+                if item.is_completed:
+                    categorized["done"].append(item)
+                elif item.due_date and item.due_date < now_utc:
+                    categorized["overdue"].append(item)
+                else: # Not completed and due date is in the future or not set
+                    categorized["pending"].append(item)
+            
+            # Use the new schema to format the output
+            item_schema = MyTasksItemSchema()
+            
+            response_data = {
+                "pending": item_schema.dump(categorized["pending"], many=True),
+                "overdue": item_schema.dump(categorized["overdue"], many=True),
+                "done": item_schema.dump(categorized["done"], many=True)
+            }
+            
+            return response_data, 200
+
+        except SQLAlchemyError as e:
+            current_app.logger.error(f"Database error fetching categorized tasks for user {user_id}: {str(e)}")
+            return {"error": "Lỗi cơ sở dữ liệu khi lấy công việc"}, 500
+        except Exception as e:
+            current_app.logger.error(f"Unexpected error fetching categorized tasks for user {user_id}: {str(e)}")
+            return {"error": "Lỗi không mong muốn khi lấy công việc"}, 500
 
     @staticmethod
     def get_all_checklist_profiles(user_id):
@@ -392,4 +512,3 @@ class ChecklistService:
             db.session.rollback()
             current_app.logger.error(f"Unexpected error removing document {document_id}: {str(e)}")
             return {"error": str(e)}, 400
-

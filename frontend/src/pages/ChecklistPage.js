@@ -6,6 +6,8 @@ import ChecklistProfileHeader from '../components/checklists/ChecklistProfileHea
 import ChecklistCategory from '../components/checklists/ChecklistCategory';
 import MainLayout from '../components/layout/MainLayout';
 import { ArrowRight, Save, XCircle, Plus } from 'lucide-react';
+import TaskModal from '../components/checklists/TaskModal';
+import { useToast } from '../context/ToastContext';
 import './ChecklistPage.css'; // We will create this CSS file next
 
 // Helper for deep cloning
@@ -20,6 +22,9 @@ const ChecklistPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState(null);
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const { showToast } = useToast();
 
     const fetchChecklistData = useCallback(async () => {
         if (!authService.isAuthenticated() && !authService.isGuestSessionActive()) {
@@ -51,6 +56,16 @@ const ChecklistPage = () => {
     useEffect(() => {
         fetchChecklistData();
     }, [fetchChecklistData]);
+
+    const handleOpenTaskModal = (task) => {
+        setSelectedTask(task);
+        setIsTaskModalOpen(true);
+    };
+
+    const handleCloseTaskModal = () => {
+        setSelectedTask(null);
+        setIsTaskModalOpen(false);
+    };
 
     // Handlers now update the DRAFT state, not the server
     const handleTaskToggle = (itemId, newCompletedState) => {
@@ -306,11 +321,13 @@ const ChecklistPage = () => {
     }
     console.log("Rendering with draft data:", draftData);
     const renderChecklistContent = () => {
-        if (!draftData || !draftData.categories || draftData.categories.length === 0) {
+        if (!draftData) {
             return (
                 <div className="info-message">No checklist data found.</div>
             );
         }
+
+        const sortedCategories = draftData.categories ? [...draftData.categories].sort((a, b) => a.id - b.id) : [];
 
         return (
             <div className="checklist-page-container">
@@ -336,10 +353,15 @@ const ChecklistPage = () => {
 
                 {/* Pass DRAFT data to the header */}
                 <ChecklistProfileHeader
-                    dueDate={new Date(draftData.due_date).toLocaleDateString('en-GB')}
+                    dueDate={draftData.due_date ? new Date(draftData.due_date).toLocaleDateString('en-GB') : ''}
                     completedTasks={completedTasks}
                     totalTasks={totalTasks}
                     onDateChange={handleProfileDateChange}
+                    onSaveChanges={handleSaveChanges}
+                    onCancelChanges={handleCancelChanges}
+                    onExportPDF={handleExportPDF}
+                    isDirty={JSON.stringify(originalChecklistData) !== JSON.stringify(draftData)}
+                    isSaving={isSaving}
                 />
                 
                 <div className="task-list-header-section">
@@ -358,21 +380,25 @@ const ChecklistPage = () => {
 
                 <div className="checklist-content">
                     {/* Pass DRAFT data to categories */}
-                    {draftData.categories && draftData.categories.length > 0 ? (
-                        draftData.categories.map(category => (
+                    {sortedCategories.length > 0 ? (
+                        sortedCategories.map(category => (
                             <ChecklistCategory
                                 key={category.id}
                                 category={category}
                                 onTaskToggle={handleTaskToggle}
                                 onTaskDateChange={handleTaskDateChange}
-                                onAddItem={() => handleAddItem(category.id)}
+                                onAddItem={handleAddItem}
                                 onCategoryUpdate={handleCategoryUpdate}
                                 onTaskUpdate={handleTaskUpdate}
                                 onTaskDelete={handleTaskDelete}
+                                onOpenTaskModal={handleOpenTaskModal}
                             />
                         ))
                     ) : (
-                        <p className="info-message">This checklist currently has no categories or tasks.</p>
+                        <div className="empty-checklist-message">
+                            <p>Chưa có danh mục nào trong checklist này.</p>
+                            <p>Hãy bắt đầu bằng cách thêm một danh mục mới!</p>
+                        </div>
                     )}
                 </div>
             </div>
@@ -382,6 +408,13 @@ const ChecklistPage = () => {
     return (
         <MainLayout pageType="checklist">
             {renderChecklistContent()}
+            <TaskModal
+                isOpen={isTaskModalOpen}
+                onClose={handleCloseTaskModal}
+                task={selectedTask}
+                onTaskUpdate={handleTaskUpdate}
+                onTaskDelete={handleTaskDelete}
+            />
         </MainLayout>
     );
 };
