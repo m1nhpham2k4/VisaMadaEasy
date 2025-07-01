@@ -54,7 +54,7 @@ def _get_ai_response(user_message):
     Returns the bot's reply string or raises an exception.
     """
     api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key:
+    if not api_key: 
         print("Error: Gemini API key missing from .env")
         raise ValueError("AI service configuration missing")
 

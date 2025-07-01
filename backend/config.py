@@ -4,6 +4,7 @@ from datetime import timedelta
 def get_database_uri():
     db_user = os.environ.get("POSTGRES_USER", "postgres")
     db_password = os.environ.get("POSTGRES_PASSWORD")
+    print
     db_host = os.environ.get("POSTGRES_HOST", "db" if os.environ.get("RUNNING_IN_DOCKER") else "localhost")
     db_port = os.environ.get("POSTGRES_PORT", "5432")
     db_name = os.environ.get("POSTGRES_DB", "Immigration_chatbot_db")
