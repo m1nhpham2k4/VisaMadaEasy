@@ -59,8 +59,8 @@ const LandingPage = () => {
                 </div>
                 <div className="hero-content">
                     <div className="logo-large">
-                        <span className="logo-visamade">visamade</span>
-                        <span className="logo-easy">easy</span>
+                        <span className="logo-visamade">VisaMade</span>
+                        <span className="logo-easy">Easy</span>
                     </div>
                     <h1>Trợ thủ AI cho hồ sơ du học của bạn</h1>
                 </div>

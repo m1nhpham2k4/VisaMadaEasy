@@ -9,9 +9,12 @@ dev-debug.log
 # Dependency directories
 node_modules/
 
-# Environment variables
 .env
 backend/.env
+
+# Python virtual environment
+backend/venv/
+
 
 # Editor directories and files
 .idea

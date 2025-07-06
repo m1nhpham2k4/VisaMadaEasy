@@ -1,14 +1,20 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
+
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request, jwt_required, current_user
-import os
 import google.generativeai as genai
 from dotenv import load_dotenv
 from .models import ChatSession, ChatMessage
 from ..auth.models import User 
-from ..auth.routes import GuestUser # Assuming GuestUser is defined in auth.routes
+from ..auth.routes import GuestUser  # Assuming GuestUser is defined in auth.routes
 from ..extensions import db
 from datetime import datetime, timezone
 from sqlalchemy import desc
+
+from .ai_response import get_ai_response
+from .embedding_model import embedding_model, faiss_index, chunks
 
 # Load environment variables
 load_dotenv()
@@ -48,21 +54,21 @@ def _get_user_and_identity():
             
     return active_user, is_guest, identity_for_logging
 
-def _get_ai_response(user_message):
-    """
-    Generates a response from the AI model.
-    Returns the bot's reply string or raises an exception.
-    """
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key: 
-        print("Error: Gemini API key missing from .env")
-        raise ValueError("AI service configuration missing")
+# def _get_ai_response(user_message):
+#     """
+#     Generates a response from the AI model.
+#     Returns the bot's reply string or raises an exception.
+#     """
+#     api_key = os.getenv('GEMINI_API_KEY')
+#     if not api_key: 
+#         print("Error: Gemini API key missing from .env")
+#         raise ValueError("AI service configuration missing")
 
-    genai.configure(api_key=api_key)
-    model_name = os.getenv('GEMINI_MODEL_NAME', 'gemini-2.5-flash') 
-    model = genai.GenerativeModel(model_name)
-    response = model.generate_content(contents=[user_message])
-    return response.text
+#     genai.configure(api_key=api_key)
+#     model_name = os.getenv('GEMINI_MODEL_NAME', 'gemini-2.5-flash') 
+#     model = genai.GenerativeModel(model_name)
+#     response = model.generate_content(contents=[user_message])
+#     return response.text
 
 def _save_chat_interaction(active_user, user_message, bot_reply, current_session_id_int):
     """
@@ -135,7 +141,7 @@ def handle_message():
 
     bot_reply = ""
     try:
-        bot_reply = _get_ai_response(user_message)
+        bot_reply = get_ai_response(user_message)
     except ValueError as e: 
         return jsonify({"error": str(e)}), 500
     except Exception as e:
