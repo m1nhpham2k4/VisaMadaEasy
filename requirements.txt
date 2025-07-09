@@ -3,4 +3,8 @@ Flask-JWT-Extended
 bcrypt
 psycopg2-binary
 Flask-SQLAlchemy
-Flask-Limiter 
+Flask-Limiter
+marshmallow
+python-dotenv
+pytest
+pytest-dotenv 
