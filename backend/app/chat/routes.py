@@ -13,7 +13,7 @@ from ..extensions import db
 from datetime import datetime, timezone
 from sqlalchemy import desc
 
-from .ai_response import get_ai_response
+from .ai_response import get_ai_response_with_title
 from .embedding_model import embedding_model, faiss_index, chunks
 
 # Load environment variables
@@ -70,7 +70,7 @@ def _get_user_and_identity():
 #     response = model.generate_content(contents=[user_message])
 #     return response.text
 
-def _save_chat_interaction(active_user, user_message, bot_reply, current_session_id_int):
+def _save_chat_interaction(active_user, user_message, bot_reply, current_session_id_int, suggested_title=None):
     """
     Saves the user and bot messages to the database for a registered user.
     Creates a new session if one doesn't exist or isn't provided.
@@ -81,14 +81,20 @@ def _save_chat_interaction(active_user, user_message, bot_reply, current_session
         current_chat_session = ChatSession.query.filter_by(id=current_session_id_int, user_id=active_user.id).first()
 
     if not current_chat_session and active_user:
-        new_session_title = (user_message[:47] + "...") if len(user_message) > 50 else user_message
-        if not new_session_title.strip(): 
-            new_session_title = "New Chat"
+        # Use the AI-suggested title if available
+        if suggested_title and suggested_title.strip():
+            new_session_title = suggested_title
+        else:
+            # Fallback to simple truncation
+            new_session_title = (user_message[:47] + "...") if len(user_message) > 50 else user_message
+            if not new_session_title.strip():
+                new_session_title = "New Chat"
+                
         current_chat_session = ChatSession(user_id=active_user.id, title=new_session_title)
         db.session.add(current_chat_session)
         db.session.flush() 
 
-    if not current_chat_session: # Should not happen if active_user is present
+    if not current_chat_session:
         print("Error: Could not find or create chat session for saving.")
         return None
 
@@ -119,29 +125,13 @@ def handle_message():
         except ValueError:
             pass 
 
-    active_user = None
-    is_guest = True
-    identity_for_logging = 'guest_default' # Default logging identity
+    active_user, is_guest, identity_for_logging = _get_user_and_identity()
 
-    if isinstance(current_user, GuestUser):
-        is_guest = True
-        identity_for_logging = current_user.guest_id
-    elif isinstance(current_user, User):
-        active_user = current_user
-        is_guest = False
-        identity_for_logging = active_user.username
-    else: # No current_user or not User/GuestUser (e.g. no token, or unhandled token type)
-        # Attempt to get identity if token was present but didn't load a user via user_lookup
-        # This can happen if token is for a guest_id but GuestUser wasn't returned by user_lookup for some reason
-        jwt_identity_val = get_jwt_identity() 
-        if jwt_identity_val:
-            identity_for_logging = jwt_identity_val
-        else:
-            identity_for_logging = 'guest_no_token_or_id'
-
-    bot_reply = ""
+    ai_response = {}
     try:
-        bot_reply = get_ai_response(user_message)
+        # Get both reply and title in one call
+        ai_response = get_ai_response_with_title(user_message)
+        bot_reply = ai_response.get("reply", "")
     except ValueError as e: 
         return jsonify({"error": str(e)}), 500
     except Exception as e:
@@ -153,7 +143,14 @@ def handle_message():
     session_id_for_response = None
     if not is_guest and active_user:
         try:
-            session_id_for_response = _save_chat_interaction(active_user, user_message, bot_reply, current_session_id_int)
+            # Use the title from AI response for new sessions
+            session_id_for_response = _save_chat_interaction(
+                active_user, 
+                user_message, 
+                bot_reply, 
+                current_session_id_int,
+                ai_response.get("title")  # Pass the title
+            )
         except Exception as db_error:
             db.session.rollback()
             print(f"Database error for user '{identity_for_logging}': {str(db_error)}")
@@ -161,11 +158,9 @@ def handle_message():
             traceback.print_exc()
             if current_session_id_int: 
                 session_id_for_response = current_session_id_int
-    elif is_guest and current_session_id_int is not None: # For guests, just pass through session_id if provided
+    elif is_guest and current_session_id_int is not None:
         session_id_for_response = current_session_id_int
     elif is_guest and current_session_id_int is None:
-        # For guests, if no session_id is provided, we don't create one on the backend.
-        # The client can manage a temporary session ID if needed.
         pass 
 
     response_data = {"reply": bot_reply}

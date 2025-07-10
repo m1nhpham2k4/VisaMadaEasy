@@ -5,11 +5,29 @@ import './TopBar.css';
 import { ReactComponent as ShareIcon } from '../../assets/icons/share.svg';
 import { ReactComponent as MoreIcon } from '../../assets/icons/more_vertical.svg';
 import { ReactComponent as EditIcon } from '../../assets/icons/edit.svg';
+import { ReactComponent as AvatarIcon } from '../../assets/icons/avatar.svg';
+// Import additional icons for dropdown menu
+import trashIconSVG from '../../assets/icons/trash.svg';
+import pencilIconSVG from '../../assets/icons/pencil.svg';
+// Import ConfirmationModal for delete functionality
+import ConfirmationModal from '../common/ConfirmationModal';
+// Import apiClient for delete functionality
+import apiClient from '../../services/apiClient';
 // import { ReactComponent as MenuIcon } from '../../assets/icons/menu.svg'; // Thay thế bằng icon chuẩn nếu có
 
 const TopBar = ({ isLoggedIn, pageType }) => {
     const navigate = useNavigate();
     const location = useLocation();
+
+    // State for dropdown menu
+    const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+    // Get current session ID from URL if it exists (similar to Sidebar logic)
+    const currentSessionId = React.useMemo(() => {
+        const match = location.pathname.match(/\/chat\/(\d+)/);
+        return match ? match[1] : null;
+    }, [location.pathname]);
     
     // Xử lý cuộn đến section khi URL có fragment
     useEffect(() => {
@@ -39,7 +57,7 @@ const TopBar = ({ isLoggedIn, pageType }) => {
     };
 
     // Placeholder for user information, replace with actual auth context or props
-    const user = isLoggedIn ? { avatar: 'https://via.placeholder.com/40' } : null; // Example avatar
+    const user = isLoggedIn ? { avatar: AvatarIcon } : null; // Using SVG component
 
     const handleLogout = () => {
         // Add logout logic here
@@ -47,8 +65,64 @@ const TopBar = ({ isLoggedIn, pageType }) => {
         navigate('/login');
     };
 
+    // Handler functions for dropdown menu
+    const handleMoreOptionsClick = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        setIsMoreOptionsOpen(!isMoreOptionsOpen);
+    };
+
+    const handleRename = () => {
+        console.log('Rename functionality - to be implemented');
+        setIsMoreOptionsOpen(false);
+        // Future implementation: Show a modal or inline edit for renaming
+    };
+
+    const handleDelete = () => {
+        if (!currentSessionId) {
+            console.warn('No current session ID found for deletion');
+            return;
+        }
+        setIsDeleteModalOpen(true);
+        setIsMoreOptionsOpen(false);
+    };
+
+    const handleCloseDeleteModal = () => {
+        setIsDeleteModalOpen(false);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (currentSessionId) {
+            try {
+                await apiClient.delete(`/chat/sessions/${currentSessionId}`);
+                // Navigate to home after successful deletion
+                navigate('/home');
+            } catch (error) {
+                console.error("Failed to delete chat:", error);
+                alert("Không thể xóa đoạn chat. Vui lòng thử lại sau.");
+            } finally {
+                setIsDeleteModalOpen(false);
+            }
+        }
+    };
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = () => {
+            setIsMoreOptionsOpen(false);
+        };
+
+        if (isMoreOptionsOpen) {
+            document.addEventListener('click', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+        };
+    }, [isMoreOptionsOpen]);
+
     const renderLogo = () => (
-        <Link to="/" className="topbar-logo">
+        <Link to="/home" className="topbar-logo">
             <span className="logo-visamade">visamade</span>
             <span className="logo-easy">easy</span>
         </Link>
@@ -59,9 +133,12 @@ const TopBar = ({ isLoggedIn, pageType }) => {
         return `topbar ${baseClass}`;
     };
 
+    // Render the main TopBar content
+    let topBarContent;
+
     if (!isLoggedIn) {
         if (pageType === 'in-chat') {
-            return (
+            topBarContent = (
                 <nav className={getTopBarClasses('topbar-not-logged-in-chat')}>
                     <div className="topbar-left">
                         <button className="topbar-icon-button">
@@ -79,8 +156,8 @@ const TopBar = ({ isLoggedIn, pageType }) => {
                     </div>
                 </nav>
             );
-        } else if (pageType === 'started') { // Corresponds to 'state=started, isLoggedIn=no'
-            return (
+        } else if (pageType === 'started') {
+            topBarContent = (
                 <nav className={getTopBarClasses('topbar-not-logged-in-started')}>
                     <div className="topbar-left">
                         {renderLogo()}
@@ -95,8 +172,8 @@ const TopBar = ({ isLoggedIn, pageType }) => {
                     </div>
                 </nav>
             );
-        } else { // Default for not logged in (Landing Page) - Corresponds to 'state=default, isLoggedIn=no'
-            return (
+        } else {
+            topBarContent = (
                 <nav className={getTopBarClasses('topbar-not-logged-in-default')}>
                     <div className="topbar-left">
                         {renderLogo()}
@@ -113,9 +190,9 @@ const TopBar = ({ isLoggedIn, pageType }) => {
                 </nav>
             );
         }
-    } else { // Logged In
+    } else {
         if (pageType === 'in-chat') {
-            return (
+            topBarContent = (
                 <nav className={getTopBarClasses('topbar-logged-in-chat')}>
                     <div className="topbar-left">
                         {renderLogo()}
@@ -125,26 +202,60 @@ const TopBar = ({ isLoggedIn, pageType }) => {
                             <ShareIcon className="topbar-icon" />
                             Chia sẻ
                         </button>
-                        <button className="topbar-icon-button">
-                            <MoreIcon className="topbar-icon" />
-                        </button>
-                        <img src={user.avatar} alt="User Avatar" className="topbar-avatar" onClick={handleLogout} />
+                        {currentSessionId && (
+                            <div className="topbar-more-options-container">
+                                <button className="topbar-icon-button" onClick={handleMoreOptionsClick}>
+                                    <MoreIcon className="topbar-icon" />
+                                </button>
+                                {isMoreOptionsOpen && (
+                                    <div className="topbar-more-options-dropdown">
+                                        <button onClick={handleRename} className="topbar-more-options-item">
+                                            <img src={pencilIconSVG} alt="Rename" />
+                                            Đổi tên
+                                        </button>
+                                        <button onClick={handleDelete} className="topbar-more-options-item topbar-more-options-item-delete">
+                                            <img src={trashIconSVG} alt="Delete" />
+                                            Xóa
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <user.avatar className="topbar-avatar" onClick={handleLogout} />
                     </div>
                 </nav>
             );
-        } else { // Default for logged in (e.g., HomePage) - Corresponds to 'state=default, isLoggedIn=yes'
-            return (
+        } else {
+            topBarContent = (
                 <nav className={getTopBarClasses('topbar-logged-in-default')}>
                     <div className="topbar-left">
                         {renderLogo()}
                     </div>
                     <div className="topbar-right">
-                        <img src={user.avatar} alt="User Avatar" className="topbar-avatar" onClick={handleLogout} />
+                        <user.avatar className="topbar-avatar" onClick={handleLogout} />
                     </div>
                 </nav>
             );
         }
     }
+
+    return (
+        <>
+            {topBarContent}
+
+            {/* Confirmation Modal for delete functionality */}
+            {isDeleteModalOpen && (
+                <ConfirmationModal
+                    isOpen={isDeleteModalOpen}
+                    onClose={handleCloseDeleteModal}
+                    onConfirm={handleConfirmDelete}
+                    title="Xác nhận xóa đoạn chat"
+                >
+                    <p>Bạn có chắc chắn muốn xóa đoạn chat này? Hành động này không thể hoàn tác.</p>
+                </ConfirmationModal>
+            )}
+        </>
+    );
 };
 
 export default TopBar;

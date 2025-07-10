@@ -143,12 +143,12 @@ const ChatbotRegisteredUserView = ({ fadeInClass }) => {
     const userMessage = { sender: 'user', text: textToSend };
     setChatHistory(prev => [...prev, userMessage]);
 
-    if (typeof messageText !== 'string') {
-        setInputValue('');
-    }
+    // Always clear input after sending
+    setInputValue('');
+    
     setIsLoading(true);
     setError(null);
-
+    
     const lastMessage = chatHistory[chatHistory.length - 1];
     if (textToSend.toLowerCase().includes('yes') && lastMessage && lastMessage.isChecklistPrompt) {
         try {
@@ -398,15 +398,15 @@ function ChatbotGuestView() {
     const textToSend = typeof messageText === 'string' ? messageText : chatInput;
     if (textToSend.trim() === '') return;
 
-    const userMessage = { id: Date.now(), text: textToSend, sender: 'user' }; // Use Date.now() for unique ID
+    const userMessage = { id: Date.now(), text: textToSend, sender: 'user' };
     setMessages(prevMessages => [...prevMessages, userMessage]);
 
-    if (typeof messageText !== 'string') {
-      setChatInput(''); // Clear input only if it was from the input field
-    }
+    // Always clear input after sending
+    setChatInput('');
+    
     setIsLoading(true);
     setError(null);
-
+    
     try {
       const data = await chatService.sendMessage(textToSend, sessionId); // Use chatService
       if (data.session_id && !sessionId) { // If it was a new chat and a session_id is returned
