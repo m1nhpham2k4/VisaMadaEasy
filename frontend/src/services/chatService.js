@@ -61,6 +61,24 @@ const chatService = {
       console.error('Lỗi lấy danh sách phiên chat:', error.response?.data || error.message);
       throw error;
     }
+  },
+
+  /**
+   * Cập nhật tiêu đề phiên chat
+   * @param {string|number} sessionId - ID của phiên chat
+   * @param {string} newTitle - Tiêu đề mới
+   * @returns {Promise<Object>} - Thông tin phiên chat đã cập nhật
+   */
+  updateSessionTitle: async (sessionId, newTitle) => {
+    try {
+      const response = await apiClient.put(`/chat/sessions/${sessionId}/title`, {
+        title: newTitle
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Lỗi cập nhật tiêu đề phiên chat:', error.response?.data || error.message);
+      throw error;
+    }
   }
 };
 

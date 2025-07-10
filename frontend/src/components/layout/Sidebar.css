@@ -573,3 +573,48 @@
   flex-direction: column;
   gap: 16px;
 }
+
+/* Rename functionality styles */
+.sidebar-rename-container {
+  padding: 8px 16px;
+  background: #FFFFFF;
+  border: 2px solid #3470ff;
+  border-radius: 8px;
+  width: 260px;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 3px rgba(52, 112, 255, 0.1);
+  animation: rename-focus 0.2s ease-in-out;
+}
+
+.sidebar-rename-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: #0F172B;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-rename-input:focus {
+  outline: none;
+}
+
+.sidebar-rename-input::selection {
+  background-color: rgba(52, 112, 255, 0.2);
+}
+
+/* Animation for rename focus */
+@keyframes rename-focus {
+  from {
+    transform: scale(0.98);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

@@ -221,12 +221,19 @@ function HomePageForRegisteredUserView() { // Renamed component
     const handlePinStatusChange = () => {
       fetchPinnedChats();
     };
-    
+
+    // Add event listener for title updates from sidebar/topbar
+    const handleTitleUpdate = () => {
+      fetchPinnedChats();
+    };
+
     window.addEventListener('chatPinStatusChanged', handlePinStatusChange);
-    
-    // Clean up event listener on component unmount
+    window.addEventListener('chatTitleUpdated', handleTitleUpdate);
+
+    // Clean up event listeners on component unmount
     return () => {
       window.removeEventListener('chatPinStatusChanged', handlePinStatusChange);
+      window.removeEventListener('chatTitleUpdated', handleTitleUpdate);
     };
   }, []);
 

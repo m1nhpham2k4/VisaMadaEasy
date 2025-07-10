@@ -8,6 +8,7 @@ import pinIconSVG from '../../assets/icons/pin.svg';
 import arrowDropDownIconSVG from '../../assets/landing_page_icons/arrow_drop_down.svg';
 import apiClient from '../../services/apiClient'; // Import apiClient
 import checklistService from '../../services/checklistService'; // Import checklistService
+import chatService from '../../services/chatService'; // Import chatService
 import ConfirmationModal from '../common/ConfirmationModal'; // Import ConfirmationModal
 
 // Import new icons
@@ -29,6 +30,8 @@ const Sidebar = () => {
   const [chatIdToDelete, setChatIdToDelete] = useState(null); // Stores the ID of the chat to be deleted
   const [checklistIdToDelete, setChecklistIdToDelete] = useState(null); // Stores the ID of the checklist to be deleted
   const [activeChecklistOptions, setActiveChecklistOptions] = useState(null); // Stores the ID of the checklist item whose options are open
+  const [renamingChatId, setRenamingChatId] = useState(null); // Stores the ID of the chat being renamed
+  const [renameInputValue, setRenameInputValue] = useState(''); // Stores the current value of the rename input
   const location = useLocation(); // Get the current location to determine active chat
   const [newChatId, setNewChatId] = useState(null);
   const navigate = useNavigate(); // Hook for navigation
@@ -197,12 +200,21 @@ const Sidebar = () => {
       }, 3000); // Remove highlight after 3 seconds
     };
 
-    // Add event listener
+    // Add event listener for new chat sessions
     window.addEventListener('newChatSessionCreated', handleNewChatSession);
-    
+
+    // Add event listener for title updates from TopBar
+    const handleTitleUpdate = (event) => {
+      // Refresh sidebar to show the updated title
+      fetchAndGroupSessions();
+    };
+
+    window.addEventListener('chatTitleUpdated', handleTitleUpdate);
+
     // Clean up
     return () => {
       window.removeEventListener('newChatSessionCreated', handleNewChatSession);
+      window.removeEventListener('chatTitleUpdated', handleTitleUpdate);
     };
   }, [fetchAndGroupSessions]); // Include fetchAndGroupSessions as dependency
 
@@ -240,11 +252,64 @@ const Sidebar = () => {
     }
   };
 
-  // Placeholder functions for chat item actions
+  // Chat rename functionality
   const handleRenameChat = (chatId) => {
-    console.log("Rename chat:", chatId);
-    setActiveChatOptions(null); // Close dropdown after action
-    // Future implementation: Show a modal or inline edit for renaming
+    // Find the current title of the chat
+    const allChats = [
+      ...chatHistoryGroups.pinned,
+      ...chatHistoryGroups.today,
+      ...chatHistoryGroups.yesterday,
+      ...chatHistoryGroups.previous7Days,
+      ...chatHistoryGroups.previous30Days,
+      ...chatHistoryGroups.older
+    ];
+    const chatToRename = allChats.find(chat => chat.id === chatId);
+
+    if (chatToRename) {
+      setRenamingChatId(chatId);
+      setRenameInputValue(chatToRename.name);
+      setActiveChatOptions(null); // Close dropdown after action
+    }
+  };
+
+  const handleSaveRename = async () => {
+    if (!renamingChatId || !renameInputValue.trim()) {
+      handleCancelRename();
+      return;
+    }
+
+    try {
+      await chatService.updateSessionTitle(renamingChatId, renameInputValue.trim());
+
+      // Refresh the chat sessions to reflect the change
+      await fetchAndGroupSessions();
+
+      // Emit event to update other components (homepage, topbar)
+      const titleUpdateEvent = new CustomEvent('chatTitleUpdated', {
+        detail: { sessionId: renamingChatId, newTitle: renameInputValue.trim() }
+      });
+      window.dispatchEvent(titleUpdateEvent);
+
+      // Reset rename state
+      setRenamingChatId(null);
+      setRenameInputValue('');
+    } catch (error) {
+      console.error('Failed to rename chat:', error);
+      alert('Không thể đổi tên đoạn chat. Vui lòng thử lại sau.');
+    }
+  };
+
+  const handleCancelRename = () => {
+    setRenamingChatId(null);
+    setRenameInputValue('');
+  };
+
+  const handleRenameKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSaveRename();
+    } else if (e.key === 'Escape') {
+      handleCancelRename();
+    }
   };
 
   const handleDeleteChat = (chatId) => {
@@ -334,23 +399,42 @@ const Sidebar = () => {
         <div className="sidebar-subitems-list" style={{ paddingLeft: 0 }}>
           {items.map(item => (
             <div key={item.id} className="sidebar-subitem-wrapper">
-            <Link 
-              to={item.link} 
-              className={`sidebar-subitem-tag ${item.active ? 'active' : ''} ${item.isNewChat ? 'new-chat-highlight' : ''}`}
-              title={item.name}
-            >
-              <span className="sidebar-subitem-text">{item.name}</span>
-                <img
-                  src={moreHorizontalIconSVG}
-                  alt="More options"
-                  className="sidebar-more-options-icon"
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent link navigation
-                    e.preventDefault(); // Prevent link navigation
-                    setActiveChatOptions(activeChatOptions === item.id ? null : item.id);
-                  }}
-                />
-            </Link>
+              {renamingChatId === item.id ? (
+                // Rename input mode
+                <div className="sidebar-subitem-tag sidebar-rename-container">
+                  <input
+                    type="text"
+                    value={renameInputValue}
+                    onChange={(e) => setRenameInputValue(e.target.value)}
+                    onKeyDown={handleRenameKeyDown}
+                    onBlur={handleSaveRename}
+                    onFocus={(e) => e.target.select()}
+                    className="sidebar-rename-input"
+                    autoFocus
+                    maxLength={100}
+                    placeholder="Nhập tên mới..."
+                  />
+                </div>
+              ) : (
+                // Normal display mode
+                <Link
+                  to={item.link}
+                  className={`sidebar-subitem-tag ${item.active ? 'active' : ''} ${item.isNewChat ? 'new-chat-highlight' : ''}`}
+                  title={item.name}
+                >
+                  <span className="sidebar-subitem-text">{item.name}</span>
+                    <img
+                      src={moreHorizontalIconSVG}
+                      alt="More options"
+                      className="sidebar-more-options-icon"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent link navigation
+                        e.preventDefault(); // Prevent link navigation
+                        setActiveChatOptions(activeChatOptions === item.id ? null : item.id);
+                      }}
+                    />
+                </Link>
+              )}
               {activeChatOptions === item.id && (
                 <div className="chat-options-dropdown">
                   <button onClick={() => handleTogglePin(item.id, item.isPinned)} className="chat-options-item">

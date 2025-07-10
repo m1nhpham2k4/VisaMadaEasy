@@ -255,3 +255,36 @@ def delete_session(session_id):
         "message": "Chat session deleted successfully",
         "session_id": session_id
     })
+
+@chat_bp.put('/sessions/<int:session_id>/title') # New route for renaming a chat session
+@jwt_required()
+def update_session_title(session_id):
+    if not isinstance(current_user, User):
+        return jsonify({"error": "Chat history features are only available for registered users"}), 403
+
+    session = ChatSession.query.filter_by(id=session_id, user_id=current_user.id).first()
+    if not session:
+        return jsonify({"error": "Chat session not found or access denied"}), 404
+
+    data = request.get_json()
+    if not data or 'title' not in data:
+        return jsonify({"error": "Title is required"}), 400
+
+    new_title = data['title'].strip()
+
+    # Validate title length
+    if not new_title:
+        return jsonify({"error": "Title cannot be empty"}), 400
+    if len(new_title) > 100:
+        return jsonify({"error": "Title cannot exceed 100 characters"}), 400
+
+    # Update the session title
+    session.title = new_title
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "message": "Chat session title updated successfully",
+        "session_id": session_id,
+        "title": session.title
+    })

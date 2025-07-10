@@ -13,6 +13,8 @@ import pencilIconSVG from '../../assets/icons/pencil.svg';
 import ConfirmationModal from '../common/ConfirmationModal';
 // Import apiClient for delete functionality
 import apiClient from '../../services/apiClient';
+// Import chatService for rename functionality
+import chatService from '../../services/chatService';
 // import { ReactComponent as MenuIcon } from '../../assets/icons/menu.svg'; // Thay thế bằng icon chuẩn nếu có
 
 const TopBar = ({ isLoggedIn, pageType }) => {
@@ -22,6 +24,11 @@ const TopBar = ({ isLoggedIn, pageType }) => {
     // State for dropdown menu
     const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+    // State for rename functionality
+    const [isRenamingTitle, setIsRenamingTitle] = useState(false);
+    const [sessionTitle, setSessionTitle] = useState('');
+    const [renameInputValue, setRenameInputValue] = useState('');
 
     // Get current session ID from URL if it exists (similar to Sidebar logic)
     const currentSessionId = React.useMemo(() => {
@@ -42,6 +49,28 @@ const TopBar = ({ isLoggedIn, pageType }) => {
             }
         }
     }, [location.hash]);
+
+    // Fetch session title when session ID changes
+    useEffect(() => {
+        const fetchSessionTitle = async () => {
+            if (currentSessionId && isLoggedIn && pageType === 'in-chat') {
+                try {
+                    const response = await apiClient.get('/chat/sessions');
+                    const sessions = response.data.sessions || [];
+                    const currentSession = sessions.find(session => session.id.toString() === currentSessionId);
+                    if (currentSession) {
+                        setSessionTitle(currentSession.title);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch session title:', error);
+                }
+            } else {
+                setSessionTitle('');
+            }
+        };
+
+        fetchSessionTitle();
+    }, [currentSessionId, isLoggedIn, pageType]);
 
     // Hàm điều hướng đến section với hiệu ứng trượt
     const scrollToSection = (sectionId) => {
@@ -73,9 +102,53 @@ const TopBar = ({ isLoggedIn, pageType }) => {
     };
 
     const handleRename = () => {
-        console.log('Rename functionality - to be implemented');
-        setIsMoreOptionsOpen(false);
-        // Future implementation: Show a modal or inline edit for renaming
+        if (sessionTitle) {
+            setIsRenamingTitle(true);
+            setRenameInputValue(sessionTitle);
+            setIsMoreOptionsOpen(false);
+        }
+    };
+
+    const handleSaveRename = async () => {
+        if (!currentSessionId || !renameInputValue.trim()) {
+            handleCancelRename();
+            return;
+        }
+
+        try {
+            await chatService.updateSessionTitle(currentSessionId, renameInputValue.trim());
+            setSessionTitle(renameInputValue.trim());
+            setIsRenamingTitle(false);
+            setRenameInputValue('');
+
+            // Emit event to refresh sidebar
+            const titleUpdateEvent = new CustomEvent('chatTitleUpdated', {
+                detail: { sessionId: currentSessionId, newTitle: renameInputValue.trim() }
+            });
+            window.dispatchEvent(titleUpdateEvent);
+        } catch (error) {
+            console.error('Failed to rename session:', error);
+            alert('Không thể đổi tên đoạn chat. Vui lòng thử lại sau.');
+        }
+    };
+
+    const handleCancelRename = () => {
+        setIsRenamingTitle(false);
+        setRenameInputValue('');
+    };
+
+    const handleRenameKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            handleSaveRename();
+        } else if (e.key === 'Escape') {
+            handleCancelRename();
+        }
+    };
+
+    const handleTitleClick = () => {
+        if (sessionTitle && currentSessionId) {
+            handleRename();
+        }
     };
 
     const handleDelete = () => {
@@ -196,6 +269,32 @@ const TopBar = ({ isLoggedIn, pageType }) => {
                 <nav className={getTopBarClasses('topbar-logged-in-chat')}>
                     <div className="topbar-left">
                         {renderLogo()}
+                    </div>
+                    <div className="topbar-center">
+                        {sessionTitle && (
+                            isRenamingTitle ? (
+                                <input
+                                    type="text"
+                                    value={renameInputValue}
+                                    onChange={(e) => setRenameInputValue(e.target.value)}
+                                    onKeyDown={handleRenameKeyDown}
+                                    onBlur={handleSaveRename}
+                                    onFocus={(e) => e.target.select()}
+                                    className="topbar-title-input"
+                                    autoFocus
+                                    maxLength={100}
+                                    placeholder="Nhập tên mới..."
+                                />
+                            ) : (
+                                <h1
+                                    className="topbar-session-title"
+                                    onClick={handleTitleClick}
+                                    title="Nhấp để đổi tên"
+                                >
+                                    {sessionTitle}
+                                </h1>
+                            )
+                        )}
                     </div>
                     <div className="topbar-right">
                         <button className="topbar-button topbar-button-share">
